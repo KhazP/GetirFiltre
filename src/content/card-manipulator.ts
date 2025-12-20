@@ -109,6 +109,24 @@ export function processCards(cards: RestaurantCard[], settings: UserSettings): n
             }
         }
 
+        // Apply review count filter
+        if (settings.minReviewCount !== null && card.reviewCount !== null) {
+            if (card.reviewCount < settings.minReviewCount) {
+                hideCard(card.element);
+                hiddenCount++;
+                return;
+            }
+        }
+
+        // Apply distance filter
+        if (settings.maxDistance !== null && card.distance !== null) {
+            if (card.distance > settings.maxDistance) {
+                hideCard(card.element);
+                hiddenCount++;
+                return;
+            }
+        }
+
         // Card passed filters - inject block button
         if (settings.isEnabled) {
             injectBlockButton(card);

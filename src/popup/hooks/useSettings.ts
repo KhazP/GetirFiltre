@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { UserSettings, DEFAULT_SETTINGS } from '../shared/types';
-import { storage } from '../shared/storage';
+import { UserSettings, DEFAULT_SETTINGS } from '../../shared/types';
+import { storage } from '../../shared/storage';
 
 export function useSettings() {
     const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
@@ -8,7 +8,7 @@ export function useSettings() {
 
     // Load initial settings
     useEffect(() => {
-        storage.getSettings().then((loaded) => {
+        storage.getSettings().then((loaded: UserSettings) => {
             setSettings(loaded);
             setIsLoading(false);
         });
@@ -16,7 +16,7 @@ export function useSettings() {
 
     // Listen for changes
     useEffect(() => {
-        storage.onSettingsChange((newSettings) => {
+        storage.onSettingsChange((newSettings: UserSettings) => {
             setSettings(newSettings);
         });
     }, []);
@@ -37,15 +37,15 @@ export function useSettings() {
     // Clear blocklist
     const clearBlocklist = async () => {
         await storage.clearBlocklist();
-        setSettings((prev) => ({ ...prev, blockedRestaurants: [] }));
+        setSettings((prev: UserSettings) => ({ ...prev, blockedRestaurants: [] }));
     };
 
     // Unblock single restaurant
     const unblockRestaurant = async (slug: string) => {
         await storage.unblockRestaurant(slug);
-        setSettings((prev) => ({
+        setSettings((prev: UserSettings) => ({
             ...prev,
-            blockedRestaurants: prev.blockedRestaurants.filter((s) => s !== slug),
+            blockedRestaurants: prev.blockedRestaurants.filter((s: string) => s !== slug),
         }));
     };
 

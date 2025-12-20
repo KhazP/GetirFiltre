@@ -4,22 +4,25 @@ import { crx } from '@crxjs/vite-plugin';
 import manifest from './manifest.json';
 
 export default defineConfig({
-  plugins: [
-    react(),
-    crx({ manifest }),
-  ],
-  build: {
-    rollupOptions: {
-      input: {
-        popup: 'src/popup/index.html',
-      },
+    plugins: [
+        react(),
+        crx({ manifest }),
+    ],
+    build: {
+        rollupOptions: {
+            input: {
+                popup: 'src/popup/index.html',
+            },
+        },
     },
-  },
-  server: {
-    port: 5173,
-    strictPort: true,
-    hmr: {
-      port: 5173,
+    server: {
+        port: 5173,
+        strictPort: true,
+        hmr: {
+            port: 5173,
+        },
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+        },
     },
-  },
 });

@@ -1,0 +1,1 @@
+chrome.runtime.onInstalled.addListener(e=>{e.reason==="install"?console.log("[GetirFiltre] Extension installed!"):e.reason==="update"&&console.log("[GetirFiltre] Extension updated to version",chrome.runtime.getManifest().version)});chrome.runtime.onStartup.addListener(()=>{console.log("[GetirFiltre] Browser started")});

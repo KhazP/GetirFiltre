@@ -30,6 +30,12 @@ export const PARSE_PATTERNS = {
     // Rating: exactly X.X format (not distance like 6.2 km)
     RATING: /^(\d\.\d)$/,
 
+    // Rating with review count: "4.6 (9000+)" or "4.3 (200+)"
+    RATING_WITH_REVIEWS: /(\d+\.\d+)\s*\((\d+)\+?\)/,
+
+    // Distance: "1.9 km" or "0,7 km" (Turkish locale uses comma)
+    DISTANCE: /([\d,.]+)\s*km/i,
+
     // Min basket: "Min. ₺260" or "Min. 260₺"
     MIN_BASKET: /Min\.\s*₺?(\d+)/i,
 

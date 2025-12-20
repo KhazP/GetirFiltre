@@ -90,14 +90,17 @@ export function extractRestaurantData(element: HTMLElement): RestaurantCard | nu
         const nameElement = element.querySelector<HTMLParagraphElement>(SELECTORS.RESTAURANT_NAME);
         const name = nameElement?.textContent?.trim() || 'Unknown Restaurant';
 
-        // Extract rating
-        const rating = extractRating(element);
+        // Extract rating and review count
+        const { rating, reviewCount } = extractRatingAndReviews(element);
 
         // Extract min basket price
         const minBasket = extractMinBasket(element);
 
         // Extract delivery time
         const deliveryTime = extractDeliveryTime(element);
+
+        // Extract distance
+        const distance = extractDistance(element);
 
         // Check if sponsored
         const isSponsored = element.textContent?.includes('Sponsorlu') || false;
@@ -107,8 +110,10 @@ export function extractRestaurantData(element: HTMLElement): RestaurantCard | nu
             slug,
             name,
             rating,
+            reviewCount,
             minBasket,
             deliveryTime,
+            distance,
             isSponsored,
         };
     } catch (error) {
@@ -118,27 +123,64 @@ export function extractRestaurantData(element: HTMLElement): RestaurantCard | nu
 }
 
 /**
- * Extract rating from card
- * Returns null if no rating (new restaurant)
+ * Extract rating and review count from card
+ * Returns null for each if not found (new restaurant)
  */
-function extractRating(element: HTMLElement): number | null {
-    // Look for LabelWrapper elements
+function extractRatingAndReviews(element: HTMLElement): { rating: number | null; reviewCount: number | null } {
+    const text = element.textContent || '';
+
+    // Try to match "4.6 (9000+)" format first
+    const match = text.match(PARSE_PATTERNS.RATING_WITH_REVIEWS);
+    if (match) {
+        const rating = parseFloat(match[1]);
+        const reviewCount = parseInt(match[2], 10);
+
+        // Sanity check: ratings should be between 1-5
+        if (rating >= 1 && rating <= 5) {
+            return { rating, reviewCount };
+        }
+    }
+
+    // Fallback: try old method for rating only
     const wrappers = element.querySelectorAll(SELECTORS.RATING_WRAPPER);
-
     for (const wrapper of wrappers) {
-        const text = wrapper.textContent?.trim() || '';
-
-        // Extract just the rating number (e.g., "4.5" from "4.5 (9000+)")
-        const words = text.split(/\s+/);
+        const wrapperText = wrapper.textContent?.trim() || '';
+        const words = wrapperText.split(/\s+/);
         for (const word of words) {
-            const match = word.match(PARSE_PATTERNS.RATING);
-            if (match) {
-                const rating = parseFloat(match[1]);
-                // Sanity check: ratings should be between 1-5
+            const ratingMatch = word.match(PARSE_PATTERNS.RATING);
+            if (ratingMatch) {
+                const rating = parseFloat(ratingMatch[1]);
                 if (rating >= 1 && rating <= 5) {
-                    return rating;
+                    return { rating, reviewCount: null };
                 }
             }
+        }
+    }
+
+    return { rating: null, reviewCount: null };
+}
+
+/**
+ * Extract distance from card
+ * Returns distance in km, null if not found
+ * Handles Turkish locale (comma as decimal separator)
+ * Uses innerText to preserve whitespace between DOM elements
+ */
+function extractDistance(element: HTMLElement): number | null {
+    // Use innerText instead of textContent - it preserves whitespace between elements
+    const text = element.innerText || '';
+
+    // Look for standalone distance pattern: space/newline before the number
+    // This avoids matching concatenated price+distance like "₺1500.7 km"
+    const match = text.match(/(?:^|[\s\n])(\d+[,.]?\d*)\s*km/i);
+
+    if (match) {
+        // Replace comma with dot for Turkish locale support
+        const normalized = match[1].replace(',', '.');
+        const distance = parseFloat(normalized);
+        // Sanity check: distance should be reasonable (0-50 km)
+        if (distance >= 0 && distance <= 50) {
+            return distance;
         }
     }
 
@@ -147,13 +189,22 @@ function extractRating(element: HTMLElement): number | null {
 
 /**
  * Extract minimum basket price
+ * Uses innerText to preserve whitespace between elements
  */
 function extractMinBasket(element: HTMLElement): number | null {
-    const text = element.textContent || '';
-    const match = text.match(PARSE_PATTERNS.MIN_BASKET);
+    // Use innerText instead of textContent
+    const text = element.innerText || '';
+
+    // Look for "Min. ₺XXX" pattern - use a more specific regex
+    // that expects a space/newline after the number (before "km" or other text)
+    const match = text.match(/Min\.\s*₺?(\d+)(?=\s|$|[^\d])/i);
 
     if (match) {
-        return parseInt(match[1], 10);
+        const value = parseInt(match[1], 10);
+        // Sanity check: basket limits are typically 0-2000₺
+        if (value > 0 && value <= 2000) {
+            return value;
+        }
     }
 
     return null;

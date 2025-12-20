@@ -5,6 +5,8 @@ export interface UserSettings {
     isEnabled: boolean;
     minRating: number | null;
     maxMinBasket: number | null;
+    minReviewCount: number | null;
+    maxDistance: number | null;
     blockedRestaurants: string[]; // Array of slugs
 }
 
@@ -16,8 +18,10 @@ export interface RestaurantCard {
     slug: string;
     name: string;
     rating: number | null; // null if no rating (new restaurant)
+    reviewCount: number | null; // null if no reviews yet
     minBasket: number | null;
     deliveryTime: string | null;
+    distance: number | null; // in km
     isSponsored: boolean;
 }
 
@@ -28,6 +32,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
     isEnabled: true,
     minRating: null,
     maxMinBasket: null,
+    minReviewCount: null,
+    maxDistance: null,
     blockedRestaurants: [],
 };
 
