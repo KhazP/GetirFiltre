@@ -32,8 +32,9 @@
    npm run build
    ```
 
-4. **Load in Chrome**
-   - Open `chrome://extensions/`
+4. **Load in Browser**
+   - **Chrome**: Open `chrome://extensions/`
+   - **Brave**: Open `brave://extensions/`
    - Enable **Developer mode** (toggle in top right)
    - Click **Load unpacked**
    - Select the `dist` folder from this project
