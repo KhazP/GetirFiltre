@@ -56,6 +56,37 @@ article:hover .getirfiltre-btn-container,
 .getirfiltre-block-btn:active {
   transform: scale(0.95);
 }
+
+/* Restaurant detail page block button - persistent */
+.getirfiltre-restaurant-page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 12px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  vertical-align: middle;
+}
+
+.getirfiltre-restaurant-page-btn:hover {
+  background: rgba(220, 38, 38, 1);
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.getirfiltre-restaurant-page-btn:active {
+  transform: scale(0.95);
+}
 `;
 
 function injectStyles(): void {
@@ -193,12 +224,95 @@ function setupObserver(): void {
 }
 
 /**
+ * Inject a block button on the restaurant detail page
+ */
+async function injectRestaurantPageBlockButton(): Promise<void> {
+    // Check if already injected
+    if (document.querySelector(`.${CSS_CLASSES.RESTAURANT_PAGE_BLOCK_BUTTON}`)) {
+        return;
+    }
+
+    // Extract slug from URL
+    const slugMatch = window.location.href.match(URL_PATTERNS.RESTAURANT_DETAIL);
+    if (!slugMatch) return;
+
+    const slug = slugMatch[1];
+
+    // Find the restaurant name header - look for the main heading
+    // Getir uses various selectors, try multiple approaches
+    let headerContainer: HTMLElement | null = null;
+
+    // Try to find the restaurant name element (usually a heading or prominent text)
+    const possibleHeaders = document.querySelectorAll('h1, h2, [class*="RestaurantName"], [class*="restaurantName"]');
+    for (const header of possibleHeaders) {
+        if (header.textContent && header.textContent.length > 2 && header.textContent.length < 100) {
+            headerContainer = header as HTMLElement;
+            break;
+        }
+    }
+
+    // Fallback: look for the area near the restaurant image
+    if (!headerContainer) {
+        const infoSection = document.querySelector('[class*="InfoSection"], [class*="RestaurantInfo"], article');
+        if (infoSection) {
+            const firstP = infoSection.querySelector('p, h1, h2, span');
+            if (firstP && firstP.textContent && firstP.textContent.length > 2) {
+                headerContainer = firstP as HTMLElement;
+            }
+        }
+    }
+
+    if (!headerContainer) {
+        console.log('[GetirFiltre] Could not find restaurant header on detail page');
+        return;
+    }
+
+    // Create button
+    const button = document.createElement('button');
+    button.className = CSS_CLASSES.RESTAURANT_PAGE_BLOCK_BUTTON;
+    button.innerHTML = '×';
+    button.title = 'Restoran Gizle (Block Restaurant)';
+    button.setAttribute('aria-label', 'Block this restaurant');
+
+    // Handle click
+    button.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        await storage.blockRestaurant(slug);
+
+        // Visual feedback
+        button.innerHTML = '✓';
+        button.style.background = 'rgba(34, 197, 94, 0.9)';
+        button.title = 'Blocked!';
+
+        console.log(`[GetirFiltre] Blocked restaurant from detail page: ${slug}`);
+
+        // Optional: redirect back after a short delay
+        setTimeout(() => {
+            window.history.back();
+        }, 500);
+    });
+
+    // Insert button after the header
+    headerContainer.style.display = 'inline-flex';
+    headerContainer.style.alignItems = 'center';
+    headerContainer.appendChild(button);
+
+    console.log(`[GetirFiltre] Injected block button on restaurant page: ${slug}`);
+}
+
+/**
  * Initialize the content script
  */
 async function init(): Promise<void> {
-    // Check if we're on the right page
-    if (!URL_PATTERNS.RESTAURANTS_PAGE.test(window.location.href)) {
-        console.log('[GetirFiltre] Not on restaurants page, skipping');
+    const url = window.location.href;
+    const isRestaurantsPage = URL_PATTERNS.RESTAURANTS_PAGE.test(url);
+    const isRestaurantDetailPage = URL_PATTERNS.RESTAURANT_DETAIL.test(url);
+
+    // Check if we're on a supported page
+    if (!isRestaurantsPage && !isRestaurantDetailPage) {
+        console.log('[GetirFiltre] Not on a supported page, skipping');
         return;
     }
 
@@ -215,7 +329,25 @@ async function init(): Promise<void> {
     currentSettings = await storage.getSettings();
     console.log('[GetirFiltre] Settings loaded:', currentSettings);
 
-    // Listen for settings changes
+    // Handle restaurant detail page
+    if (isRestaurantDetailPage) {
+        // Wait a bit for the page to fully render
+        setTimeout(() => {
+            injectRestaurantPageBlockButton();
+        }, 500);
+
+        // Also observe for dynamic content loading
+        const detailObserver = new MutationObserver(() => {
+            injectRestaurantPageBlockButton();
+        });
+        detailObserver.observe(document.body, { childList: true, subtree: true });
+
+        isInitialized = true;
+        console.log('[GetirFiltre] Restaurant detail page ready! 🚀');
+        return;
+    }
+
+    // Listen for settings changes (for listings page)
     storage.onSettingsChange((newSettings) => {
         console.log('[GetirFiltre] Settings updated:', newSettings);
         const oldSettings = currentSettings;

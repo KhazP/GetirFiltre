@@ -1,30 +1,30 @@
 {
   "../../../../../@crx/manifest": {
-    "file": "assets/crx-manifest.js-dbFKJz24.js",
+    "file": "assets/crx-manifest.js-CilV8d9Z.js",
     "name": "crx-manifest.js",
     "src": "../../../../../@crx/manifest",
     "isEntry": true
   },
-  "_index.tsx-loader-COmVC8EN.js": {
-    "file": "assets/index.tsx-loader-COmVC8EN.js",
-    "src": "_index.tsx-loader-COmVC8EN.js"
+  "_index.tsx-loader-DkNaEZKj.js": {
+    "file": "assets/index.tsx-loader-DkNaEZKj.js",
+    "src": "_index.tsx-loader-DkNaEZKj.js"
   },
-  "_main-DKd_9ZZL.css": {
-    "file": "assets/main-DKd_9ZZL.css",
-    "src": "_main-DKd_9ZZL.css"
+  "_main-DOVi4t-D.css": {
+    "file": "assets/main-DOVi4t-D.css",
+    "src": "_main-DOVi4t-D.css"
   },
-  "_main-GrOnjqZL.js": {
-    "file": "assets/main-GrOnjqZL.js",
+  "_main-D_km-LxB.js": {
+    "file": "assets/main-D_km-LxB.js",
     "name": "main",
     "imports": [
-      "_storage-CE-gbFcj.js"
+      "_storage-CbNMpGo2.js"
     ],
     "css": [
-      "assets/main-DKd_9ZZL.css"
+      "assets/main-DOVi4t-D.css"
     ]
   },
-  "_storage-CE-gbFcj.js": {
-    "file": "assets/storage-CE-gbFcj.js",
+  "_storage-CbNMpGo2.js": {
+    "file": "assets/storage-CbNMpGo2.js",
     "name": "storage"
   },
   "src/background/index.ts": {
@@ -34,12 +34,12 @@
     "isEntry": true
   },
   "src/content/index.tsx": {
-    "file": "assets/index.tsx-ChKZk0P8.js",
+    "file": "assets/index.tsx-B8mT9paT.js",
     "name": "index.tsx",
     "src": "src/content/index.tsx",
     "isEntry": true,
     "imports": [
-      "_storage-CE-gbFcj.js"
+      "_storage-CbNMpGo2.js"
     ]
   }
 }

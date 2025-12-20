@@ -58,6 +58,7 @@ export const CSS_CLASSES = {
     PROCESSED: 'getirfiltre-processed',
     BLOCK_BUTTON: 'getirfiltre-block-btn',
     BLOCK_BUTTON_CONTAINER: 'getirfiltre-btn-container',
+    RESTAURANT_PAGE_BLOCK_BUTTON: 'getirfiltre-restaurant-page-btn',
 } as const;
 
 /**
