@@ -25,10 +25,23 @@ export function injectBlockButton(card: RestaurantCard): void {
     button.title = 'Gizle (Hide)';
     button.setAttribute('aria-label', `Hide ${card.name}`);
 
+    // Prevent event from reaching parent anchor
+    button.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+    }, true);
+
+    button.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+    }, { capture: true, passive: false });
+
     // Handle click
     button.addEventListener('click', async (e) => {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
 
         // Add to undo buffer
         addToUndoBuffer({
@@ -43,6 +56,9 @@ export function injectBlockButton(card: RestaurantCard): void {
         // Hide immediately
         hideCard(card.element);
 
+        // Also hide any related menu items in search results
+        hideRelatedItems(card.slug);
+
         console.log(`[GetirFiltre] Blocked: ${card.name} (${card.slug})`);
     });
 
@@ -51,6 +67,61 @@ export function injectBlockButton(card: RestaurantCard): void {
     // Position container
     card.element.style.position = 'relative';
     card.element.appendChild(container);
+}
+
+/**
+ * Hide all related items (menu items) in search results that belong to the same restaurant
+ * Menu items appear as sibling elements after the restaurant card in search results
+ */
+function hideRelatedItems(slug: string): void {
+    // Find the restaurant card link with this slug
+    const restaurantLink = document.querySelector<HTMLAnchorElement>(
+        `a[href*="/yemek/restoran/${slug}/"]`
+    );
+
+    if (!restaurantLink) return;
+
+    // Find the outermost container (the anchor wrapper or its parent)
+    let container: HTMLElement | null = restaurantLink;
+
+    // Walk up to find the main search result container
+    while (container && container.parentElement) {
+        // Check if we're at a level where siblings are other search results
+        const parent: HTMLElement = container.parentElement;
+        const siblings = parent.children;
+
+        // If parent has multiple children that look like search result items, we're at the right level
+        let foundLevel = false;
+        for (const sibling of siblings) {
+            if (sibling !== container && (
+                sibling.querySelector('article[type="list-view-with-image"]') ||
+                sibling.classList.contains('sc-f5b1a14a-2') // Menu item class
+            )) {
+                foundLevel = true;
+                break;
+            }
+        }
+
+        if (foundLevel) {
+            // Now hide all following siblings that are menu items (not restaurant cards)
+            let nextSibling = container.nextElementSibling as HTMLElement | null;
+
+            while (nextSibling) {
+                // Check if this is another restaurant card - stop if so
+                if (nextSibling.querySelector('article[type="list-view-with-image"]') ||
+                    nextSibling.querySelector('a[href*="/yemek/restoran/"]')) {
+                    break;
+                }
+
+                // This looks like a menu item - hide it
+                hideCard(nextSibling);
+                nextSibling = nextSibling.nextElementSibling as HTMLElement | null;
+            }
+            break;
+        }
+
+        container = parent;
+    }
 }
 
 /**

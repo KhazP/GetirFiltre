@@ -14,17 +14,22 @@ const cssStyles = `
 .getirfiltre-btn-container {
   position: absolute;
   top: 8px;
-  right: 8px;
-  z-index: 1000;
+  left: 8px;
+  z-index: 10000;
   opacity: 0;
   transition: opacity 0.15s ease;
+  pointer-events: auto;
 }
 
-article:hover .getirfiltre-btn-container {
+article:hover .getirfiltre-btn-container,
+[class*="restaurant"]:hover .getirfiltre-btn-container,
+[class*="Restaurant"]:hover .getirfiltre-btn-container {
   opacity: 1;
 }
 
 .getirfiltre-block-btn {
+  pointer-events: auto;
+  cursor: pointer;
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -50,12 +55,6 @@ article:hover .getirfiltre-btn-container {
 
 .getirfiltre-block-btn:active {
   transform: scale(0.95);
-}
-
-@media (hover: none) {
-  .getirfiltre-btn-container {
-    opacity: 1;
-  }
 }
 `;
 

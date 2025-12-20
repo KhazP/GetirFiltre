@@ -18,7 +18,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/index.tsx-loader-BbrkLLkQ.js"
+        "assets/index.tsx-loader-COmVC8EN.js"
       ],
       "matches": [
         "https://getir.com/yemek/*"
@@ -37,7 +37,7 @@
       ],
       "resources": [
         "assets/storage-CE-gbFcj.js",
-        "assets/index.tsx-CuJlrqH5.js"
+        "assets/index.tsx-ChKZk0P8.js"
       ],
       "use_dynamic_url": false
     }
