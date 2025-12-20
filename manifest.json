@@ -1,0 +1,36 @@
+{
+    "manifest_version": 3,
+    "name": "GetirFiltre",
+    "description": "God Mode for GetirYemek - Blacklist restaurants and apply advanced filters",
+    "version": "1.0.0",
+    "icons": {
+        "128": "src/assets/icon.svg"
+    },
+    "action": {
+        "default_popup": "src/popup/index.html",
+        "default_icon": {
+            "128": "src/assets/icon.svg"
+        }
+    },
+    "permissions": [
+        "storage"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://getir.com/yemek/*"
+            ],
+            "js": [
+                "src/content/index.tsx"
+            ],
+            "css": [
+                "src/content/styles.css"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "background": {
+        "service_worker": "src/background/index.ts",
+        "type": "module"
+    }
+}

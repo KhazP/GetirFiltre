@@ -1,0 +1,57 @@
+/* GetirFiltre Content Script Styles */
+
+/* Hidden card class - uses visibility for potential lazy-load issues */
+.getirfiltre-hidden {
+  display: none !important;
+}
+
+/* Block button container */
+.getirfiltre-btn-container {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Show on card hover */
+article:hover .getirfiltre-btn-container {
+  opacity: 1;
+}
+
+/* Block button */
+.getirfiltre-block-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.getirfiltre-block-btn:hover {
+  background: rgba(220, 38, 38, 1);
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.getirfiltre-block-btn:active {
+  transform: scale(0.95);
+}
+
+/* Ensure button is always visible on touch devices */
+@media (hover: none) {
+  .getirfiltre-btn-container {
+    opacity: 1;
+  }
+}
