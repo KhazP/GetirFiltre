@@ -14,30 +14,50 @@ function OptionsApp() {
         replaceSettings,
     } = useSettings();
 
-    // Export settings
-    const handleExport = () => {
+    // Export settings using File System Access API
+    const handleExport = async () => {
         const exportData = {
             version: 1,
             exportedAt: new Date().toISOString(),
             settings: settings,
         };
 
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-            type: 'application/json',
-        });
-        const url = URL.createObjectURL(blob);
+        const jsonString = JSON.stringify(exportData, null, 2);
 
         const now = new Date();
         const pad = (n: number) => n.toString().padStart(2, '0');
         const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
+        const suggestedName = `GetirFiltreYedek${timestamp}.json`;
 
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `GetirFiltreYedek${timestamp}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        try {
+            // Use File System Access API for native Save dialog
+            const handle = await (window as any).showSaveFilePicker({
+                suggestedName: suggestedName,
+                types: [{
+                    description: 'JSON Files',
+                    accept: { 'application/json': ['.json'] },
+                }],
+            });
+
+            const writable = await handle.createWritable();
+            await writable.write(jsonString);
+            await writable.close();
+        } catch (err: any) {
+            // User cancelled or API not supported
+            if (err.name !== 'AbortError') {
+                console.error('[GetirFiltre] Export failed:', err);
+                // Fallback to anchor download
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = suggestedName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
     };
 
     const handleImport = async (importedSettings: any) => {
