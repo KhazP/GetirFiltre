@@ -9,8 +9,11 @@
 - **🚫 Restoran Engelleme Listesi**: Herhangi bir restoran kartındaki X düğmesine tıklayarak restoranı kalıcı olarak gizleyin
 - **⭐ Minimum Puan Filtresi**: Sadece belirlediğiniz puan eşiğinin üzerindeki restoranları görün
 - **💰 Maksimum Sepet Limiti**: Minimum sipariş tutarı limitinizin üzerinde olan restoranları gizleyin
+- **👁️ İnceleme Sayısı Filtresi**: Yeterli sayıda değerlendirmesi olmayan restoranları gizleyin
+- **📏 Mesafe Filtresi**: Belirlediğiniz mesafeden uzak restoranları liste dışı bırakın
 - **🔄 Senkronize Ayarlar**: Tercihleriniz Google hesabınız üzerinden Chrome tarayıcıları arasında senkronize edilir
 - **⚡ Anında Filtreleme**: Sonsuz kaydırma ile çalışır, yeni kartlar otomatik olarak filtrelenir
+- **💾 Dışa/İçe Aktar**: Ayarlarınızı ve engellenen restoran listenizi yedekleyin
 
 ## 🚀 Kurulum
 
@@ -22,75 +25,78 @@
    cd GetirFiltre
    ```
 
-2. **Install dependencies**
+2. **Bağımlılıkları yükleyin**
    ```bash
    npm install
    ```
 
-3. **Build the extension**
+3. **Uzantıyı derleyin**
    ```bash
    npm run build
    ```
 
-4. **Load in Browser**
-   - **Chrome**: Open `chrome://extensions/`
-   - **Brave**: Open `brave://extensions/`
-   - Enable **Developer mode** (toggle in top right)
-   - Click **Load unpacked**
-   - Select the `dist` folder from this project
+4. **Tarayıcıya Yükleyin**
+   - **Chrome**: `chrome://extensions/` adresine gidin
+   - **Brave**: `brave://extensions/` adresine gidin
+   - **Geliştirici modu**nu etkinleştirin (sağ üst köşedeki anahtar)
+   - **Paketlenmemiş öğe yükle** butonuna tıklayın
+   - Bu projedeki `dist` klasörünü seçin
 
-5. **Visit GetirYemek**
-   - Go to [getir.com/yemek/restoranlar](https://getir.com/yemek/restoranlar/)
-   - Click the extension icon to configure filters
-   - Hover over restaurant cards to see the block button
+5. **GetirYemek'i Ziyaret Edin**
+   - [getir.com/yemek/restoranlar](https://getir.com/yemek/restoranlar/) adresine gidin
+   - Filtreleri yapılandırmak için uzantı simgesine tıklayın
+   - Engelleme butonunu görmek için restoran kartlarının üzerine gelin
 
-## 🎮 Usage
+## 🎮 Kullanım
 
-1. **Toggle On/Off**: Click the power button in the popup to enable/disable filtering
-2. **Set Minimum Rating**: Enter a rating (e.g., 4.2) to hide restaurants below that rating
-3. **Set Maximum Basket**: Enter an amount (e.g., 300) to hide restaurants requiring higher minimums
-4. **Block a Restaurant**: Hover over any restaurant card and click the red X button
-5. **Unblock**: Open the popup, expand "Engellenen Restoranlar", and click X next to any restaurant
+1. **Aç/Kapat**: Filtrelemeyi etkinleştirmek/devre dışı bırakmak için popup'taki güç düğmesine tıklayın.
+2. **Ayarlar Sayfası**: Daha geniş bir görünüm ve detaylı yönetim için dişli çark simgesine tıklayarak ayarlar sayfasını yeni sekmede açın.
+3. **Filtreleri Ayarla**: Puan, sepet tutarı, yorum sayısı ve mesafe limitlerini belirleyin.
+4. **Restoran Engelle**: Herhangi bir restoran kartının üzerine gelin ve kırmızı X butonuna tıklayın.
+5. **Engeli Kaldır**: Ayarlar sayfasından veya popup içindeki listeden engellenen restoranları yönetin.
+6. **Yedekleme**: Ayarlar sayfasından yapılandırmanızı JSON dosyası olarak dışa aktarın.
 
-## 🛠️ Development
+## 🛠️ Geliştirme
 
 ```bash
-# Start dev server with hot reload
+# Hot reload ile geliştirme sunucusunu başlatın
 npm run dev
 
-# Build for production
+# Üretim için derleyin
 npm run build
 ```
 
-## 📁 Project Structure
+## 📁 Proje Yapısı
 
 ```
 src/
-├── content/          # Content script injected into GetirYemek
-│   ├── index.tsx     # Main entry point & MutationObserver
-│   ├── dom-scanner.ts    # Finds and parses restaurant cards
-│   └── card-manipulator.ts # Hides cards, injects buttons
-├── popup/            # Extension popup UI (React + Tailwind)
-│   ├── App.tsx       # Main popup component
-│   └── hooks/        # React hooks for settings
-├── shared/           # Shared code between content & popup
-│   ├── storage.ts    # Chrome storage wrapper
-│   ├── types.ts      # TypeScript interfaces
-│   └── constants.ts  # DOM selectors, patterns
-└── background/       # Service worker (minimal)
+├── content/          # GetirYemek içine enjekte edilen içerik betiği
+│   ├── index.tsx     # Ana giriş noktası & MutationObserver
+│   ├── dom-scanner.ts    # Restoran kartlarını bulur ve ayrıştırır
+│   ├── card-manipulator.ts # Kartları gizler, butonları enjekte eder
+│   └── styles.css    # İçerik stili
+├── popup/            # Uzantı popup arayüzü (React + Tailwind)
+│   ├── App.tsx       # Ana popup bileşeni
+│   ├── components/   # Alt bileşenler (Ayarlar Sayfası vb.)
+│   └── hooks/        # Ayarlar için React hook'ları
+├── shared/           # İçerik ve popup arasındaki ortak kodlar
+│   ├── storage.ts    # Chrome storage sarmalayıcısı
+│   ├── types.ts      # TypeScript arayüzleri
+│   └── constants.ts  # DOM seçicileri, desenler
+└── background/       # Servis çalışanı (minimal)
 ```
 
-## 🔧 Tech Stack
+## 🔧 Teknoloji Yığını
 
 - **React 18** + TypeScript
-- **Tailwind CSS** for styling
-- **Vite** + **@crxjs/vite-plugin** for Chrome extension bundling
-- **Chrome Storage API** for persistence
+- **Tailwind CSS** stil için
+- **Vite** + **@crxjs/vite-plugin** Chrome uzantı paketlemesi için
+- **Chrome Storage API** verileri saklamak için
 
-## 📝 License
+## 📝 Lisans
 
-MIT License - feel free to fork and modify!
+MIT Lisansı - çatallamakta ve değiştirmekte özgürsünüz!
 
 ---
 
-Made with 💜 for everyone tired of scrolling past the same bad restaurants.
+Kötü restoranları kaydırmaktan sıkılan herkes için 💜 ile yapıldı.

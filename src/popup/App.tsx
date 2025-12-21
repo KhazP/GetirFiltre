@@ -101,8 +101,8 @@ export default function App() {
                             height="24"
                             viewBox="0 0 128 128"
                             className={`transition-all duration-200 ${settings.isEnabled
-                                    ? 'drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]'
-                                    : 'opacity-50 grayscale'
+                                ? 'drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]'
+                                : 'opacity-50 grayscale'
                                 }`}
                         >
                             <defs>
@@ -127,7 +127,7 @@ export default function App() {
                                 setCurrentPage('settings');
                             } else {
                                 if (chrome.tabs) {
-                                    chrome.tabs.create({ url: 'index.html?page=settings' });
+                                    chrome.tabs.create({ url: chrome.runtime.getURL('src/popup/index.html?page=settings') });
                                 } else {
                                     window.open('index.html?page=settings', '_blank');
                                 }
