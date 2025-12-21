@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Settings, Trash2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
 import SettingsPage from './components/SettingsPage';
+import FilterSettings from './components/FilterSettings';
 import { UserSettings, DEFAULT_SETTINGS } from '../shared/types';
 
 type Page = 'main' | 'settings';
@@ -83,6 +84,7 @@ export default function App() {
             onImport={handleImport}
             onExport={handleExport}
             onReset={handleReset}
+            updateSetting={updateSetting}
             isTabMode={isTabMode}
         />
     ) : (
@@ -127,9 +129,9 @@ export default function App() {
                                 setCurrentPage('settings');
                             } else {
                                 if (chrome.tabs) {
-                                    chrome.tabs.create({ url: chrome.runtime.getURL('src/popup/index.html?page=settings') });
+                                    chrome.tabs.create({ url: chrome.runtime.getURL('src/options/index.html') });
                                 } else {
-                                    window.open('index.html?page=settings', '_blank');
+                                    window.open('../options/index.html', '_blank');
                                 }
                             }
                         }}
@@ -140,136 +142,17 @@ export default function App() {
                     </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                    GetirYemek için "God Mode" filtreleme
+                    Gelişmiş Filtreleme Eklentisi
                 </p>
             </header>
 
             {/* Main Content */}
             <main className="p-4 space-y-4">
-                {/* Min Rating Filter */}
-                <div className="bg-gf-dark-800 rounded-lg p-4">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Minimum Puan
-                    </label>
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="number"
-                            min="1"
-                            max="5"
-                            step="0.1"
-                            value={settings.minRating ?? ''}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                updateSetting('minRating', val ? parseFloat(val) : null);
-                            }}
-                            placeholder="örn: 4.2"
-                            disabled={!settings.isEnabled}
-                            className={`
-                flex-1 bg-gf-dark-700 border border-gf-dark-500 rounded-lg px-3 py-2
-                text-white placeholder-gray-500 font-mono text-sm
-                focus:outline-none focus:border-gf-accent-purple focus:ring-1 focus:ring-gf-accent-purple
-                disabled:opacity-50 disabled:cursor-not-allowed
-              `}
-                        />
-                        <span className="text-gray-500 text-sm">/ 5.0</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                        Bu puanın altındaki restoranlar gizlenir
-                    </p>
-                </div>
-
-                {/* Max Min Basket Filter */}
-                <div className="bg-gf-dark-800 rounded-lg p-4">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Maksimum Sepet Limiti
-                    </label>
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="number"
-                            min="0"
-                            step="10"
-                            value={settings.maxMinBasket ?? ''}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                updateSetting('maxMinBasket', val ? parseInt(val, 10) : null);
-                            }}
-                            placeholder="örn: 300"
-                            disabled={!settings.isEnabled}
-                            className={`
-                flex-1 bg-gf-dark-700 border border-gf-dark-500 rounded-lg px-3 py-2
-                text-white placeholder-gray-500 font-mono text-sm
-                focus:outline-none focus:border-gf-accent-purple focus:ring-1 focus:ring-gf-accent-purple
-                disabled:opacity-50 disabled:cursor-not-allowed
-              `}
-                        />
-                        <span className="text-gray-500 text-sm">₺</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                        Bu limiti aşan minimum sepet tutarları gizlenir
-                    </p>
-                </div>
-
-                {/* Min Review Count Filter */}
-                <div className="bg-gf-dark-800 rounded-lg p-4">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Minimum Değerlendirme Sayısı
-                    </label>
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="number"
-                            min="0"
-                            step="50"
-                            value={settings.minReviewCount ?? ''}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                updateSetting('minReviewCount', val ? parseInt(val, 10) : null);
-                            }}
-                            placeholder="örn: 500"
-                            disabled={!settings.isEnabled}
-                            className={`
-                flex-1 bg-gf-dark-700 border border-gf-dark-500 rounded-lg px-3 py-2
-                text-white placeholder-gray-500 font-mono text-sm
-                focus:outline-none focus:border-gf-accent-purple focus:ring-1 focus:ring-gf-accent-purple
-                disabled:opacity-50 disabled:cursor-not-allowed
-              `}
-                        />
-                        <span className="text-gray-500 text-sm">yorum</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                        Bu sayının altında yorumu olan restoranlar gizlenir
-                    </p>
-                </div>
-
-                {/* Max Distance Filter */}
-                <div className="bg-gf-dark-800 rounded-lg p-4">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Maksimum Mesafe
-                    </label>
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            value={settings.maxDistance ?? ''}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                updateSetting('maxDistance', val ? parseFloat(val) : null);
-                            }}
-                            placeholder="örn: 2.5"
-                            disabled={!settings.isEnabled}
-                            className={`
-                flex-1 bg-gf-dark-700 border border-gf-dark-500 rounded-lg px-3 py-2
-                text-white placeholder-gray-500 font-mono text-sm
-                focus:outline-none focus:border-gf-accent-purple focus:ring-1 focus:ring-gf-accent-purple
-                disabled:opacity-50 disabled:cursor-not-allowed
-              `}
-                        />
-                        <span className="text-gray-500 text-sm">km</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                        Bu mesafeden uzak restoranlar gizlenir
-                    </p>
-                </div>
+                <FilterSettings
+                    settings={settings}
+                    updateSetting={updateSetting}
+                    disabled={!settings.isEnabled}
+                />
 
                 {/* Blocklist Section */}
                 <div className="bg-gf-dark-800 rounded-lg overflow-hidden">

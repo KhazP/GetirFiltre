@@ -1,6 +1,10 @@
-# GetirFiltre 🍕🚫
+<p align="center">
+  <img src="src/assets/icon128.png" width="80" height="80" alt="GetirFiltre Logo">
+</p>
 
-**GetirYemek için "God Mode"** — Beğenmediğiniz restoranları gizleyin ve platformun sunduklarının ötesinde gelişmiş filtreler uygulayın.
+# GetirFiltre
+
+**GetirYemek için Gelişmiş Filtreleme Eklentisi** — Beğenmediğiniz restoranları gizleyin ve platformun sunduklarının ötesinde gelişmiş filtreler uygulayın.
 
 ![GetirFiltre Demo](docs/demo.gif)
 
