@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { Power, Filter, Trash2, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, Trash2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
+import SettingsPage from './components/SettingsPage';
+import { UserSettings, DEFAULT_SETTINGS } from '../shared/types';
+
+type Page = 'main' | 'settings';
 
 export default function App() {
     const {
@@ -10,9 +14,43 @@ export default function App() {
         updateSetting,
         clearBlocklist,
         unblockRestaurant,
+        replaceSettings,
     } = useSettings();
 
+    const [currentPage, setCurrentPage] = useState<Page>('main');
     const [showBlocklist, setShowBlocklist] = useState(false);
+
+    // Export settings as JSON file
+    const handleExport = () => {
+        const exportData = {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            settings: settings,
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json',
+        });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `getirfiltre-ayarlar-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    // Import settings from uploaded data
+    const handleImport = async (importedSettings: UserSettings) => {
+        await replaceSettings(importedSettings);
+    };
+
+    // Reset to defaults
+    const handleReset = async () => {
+        await replaceSettings(DEFAULT_SETTINGS);
+    };
 
     if (isLoading) {
         return (
@@ -22,30 +60,64 @@ export default function App() {
         );
     }
 
+    // Settings Page
+    if (currentPage === 'settings') {
+        return (
+            <SettingsPage
+                settings={settings}
+                onBack={() => setCurrentPage('main')}
+                unblockRestaurant={unblockRestaurant}
+                clearBlocklist={clearBlocklist}
+                onImport={handleImport}
+                onExport={handleExport}
+                onReset={handleReset}
+            />
+        );
+    }
+
+    // Main Page
     return (
         <div className="w-[320px] min-h-[400px] bg-gf-dark-900 text-white">
             {/* Header */}
             <header className="bg-gf-dark-800 p-4 border-b border-gf-dark-600">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Filter className="w-5 h-5 text-gf-accent-purple" />
-                        <h1 className="font-bold text-lg">GetirFiltre</h1>
-                    </div>
-
-                    {/* Master Toggle */}
+                    {/* Clickable Logo - Toggle Extension */}
                     <button
                         onClick={toggleEnabled}
-                        className={`
-              flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
-              transition-all duration-200
-              ${settings.isEnabled
-                                ? 'bg-gf-accent-purple/20 text-gf-accent-purple border border-gf-accent-purple/50'
-                                : 'bg-gf-dark-600 text-gray-400 border border-gf-dark-500'
-                            }
-            `}
+                        className="flex items-center gap-2 group"
+                        title={settings.isEnabled ? 'Uzantıyı kapat' : 'Uzantıyı aç'}
                     >
-                        <Power className="w-4 h-4" />
-                        {settings.isEnabled ? 'Aktif' : 'Kapalı'}
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 128 128"
+                            className={`transition-all duration-200 ${settings.isEnabled
+                                    ? 'drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]'
+                                    : 'opacity-50 grayscale'
+                                }`}
+                        >
+                            <defs>
+                                <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style={{ stopColor: settings.isEnabled ? '#a855f7' : '#6b7280' }} />
+                                    <stop offset="100%" style={{ stopColor: settings.isEnabled ? '#7c3aed' : '#4b5563' }} />
+                                </linearGradient>
+                            </defs>
+                            <rect width="128" height="128" rx="24" fill="url(#logo-gradient)" />
+                            <path d="M40 36h48l-8 32H48l-8-32zm8 40h32v8H48v-8zm4 12h24v8H52v-8z" fill="white" />
+                        </svg>
+                        <h1 className={`font-bold text-lg transition-colors duration-200 ${settings.isEnabled ? 'text-white' : 'text-gray-500'
+                            }`}>
+                            GetirFiltre
+                        </h1>
+                    </button>
+
+                    {/* Settings Gear */}
+                    <button
+                        onClick={() => setCurrentPage('settings')}
+                        className="p-2 rounded-lg hover:bg-gf-dark-700 transition-colors group"
+                        title="Ayarlar"
+                    >
+                        <Settings className="w-5 h-5 text-gray-400 group-hover:text-gf-accent-purple transition-colors" />
                     </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
@@ -268,3 +340,4 @@ function formatSlug(slug: string): string {
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
 }
+

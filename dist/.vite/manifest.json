@@ -1,6 +1,6 @@
 {
   "../../../../../@crx/manifest": {
-    "file": "assets/crx-manifest.js-CilV8d9Z.js",
+    "file": "assets/crx-manifest.js-D4wHWMVy.js",
     "name": "crx-manifest.js",
     "src": "../../../../../@crx/manifest",
     "isEntry": true
@@ -9,18 +9,18 @@
     "file": "assets/index.tsx-loader-DkNaEZKj.js",
     "src": "_index.tsx-loader-DkNaEZKj.js"
   },
-  "_main-DOVi4t-D.css": {
-    "file": "assets/main-DOVi4t-D.css",
-    "src": "_main-DOVi4t-D.css"
+  "_main-C1hdDm9N.css": {
+    "file": "assets/main-C1hdDm9N.css",
+    "src": "_main-C1hdDm9N.css"
   },
-  "_main-D_km-LxB.js": {
-    "file": "assets/main-D_km-LxB.js",
+  "_main-Du_Rswe9.js": {
+    "file": "assets/main-Du_Rswe9.js",
     "name": "main",
     "imports": [
       "_storage-CbNMpGo2.js"
     ],
     "css": [
-      "assets/main-DOVi4t-D.css"
+      "assets/main-C1hdDm9N.css"
     ]
   },
   "_storage-CbNMpGo2.js": {

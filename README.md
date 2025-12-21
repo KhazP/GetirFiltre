@@ -1,24 +1,24 @@
 # GetirFiltre 🍕🚫
 
-**"God Mode" for GetirYemek** — Hide restaurants you don't like and apply advanced filters beyond what the platform offers.
+**GetirYemek için "God Mode"** — Beğenmediğiniz restoranları gizleyin ve platformun sunduklarının ötesinde gelişmiş filtreler uygulayın.
 
 ![GetirFiltre Demo](docs/demo.gif)
 
-## ✨ Features
+## ✨ Özellikler
 
-- **🚫 Restaurant Blacklist**: Click the X button on any restaurant card to permanently hide it
-- **⭐ Minimum Rating Filter**: Only see restaurants above your minimum rating threshold
-- **💰 Maximum Basket Limit**: Hide restaurants with minimum order amounts above your limit
-- **🔄 Synced Settings**: Your preferences sync across Chrome browsers via your Google account
-- **⚡ Instant Filtering**: Works with infinite scroll, new cards are filtered automatically
+- **🚫 Restoran Engelleme Listesi**: Herhangi bir restoran kartındaki X düğmesine tıklayarak restoranı kalıcı olarak gizleyin
+- **⭐ Minimum Puan Filtresi**: Sadece belirlediğiniz puan eşiğinin üzerindeki restoranları görün
+- **💰 Maksimum Sepet Limiti**: Minimum sipariş tutarı limitinizin üzerinde olan restoranları gizleyin
+- **🔄 Senkronize Ayarlar**: Tercihleriniz Google hesabınız üzerinden Chrome tarayıcıları arasında senkronize edilir
+- **⚡ Anında Filtreleme**: Sonsuz kaydırma ile çalışır, yeni kartlar otomatik olarak filtrelenir
 
-## 🚀 Installation
+## 🚀 Kurulum
 
-### From Source (Developer Mode)
+### Kaynaktan (Geliştirici Modu)
 
-1. **Clone the repository**
+1. **Depoyu kopyalayın**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/GetirFiltre.git
+   git clone https://github.com/alpya/GetirFiltre.git
    cd GetirFiltre
    ```
 

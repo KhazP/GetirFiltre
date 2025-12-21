@@ -49,6 +49,12 @@ export function useSettings() {
         }));
     };
 
+    // Replace all settings (for import/reset)
+    const replaceSettings = async (newSettings: UserSettings) => {
+        setSettings(newSettings);
+        await storage.saveSettings(newSettings);
+    };
+
     return {
         settings,
         isLoading,
@@ -56,5 +62,7 @@ export function useSettings() {
         toggleEnabled,
         clearBlocklist,
         unblockRestaurant,
+        replaceSettings,
     };
 }
+
