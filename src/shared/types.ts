@@ -7,6 +7,9 @@ export interface UserSettings {
     maxMinBasket: number | null;
     minReviewCount: number | null;
     maxDistance: number | null;
+    maxDeliveryTime: number | null; // in minutes
+    showOnlyPromotions: boolean; // show only restaurants with active deals
+    hideSponsored: boolean; // hide sponsored restaurants
     blockedRestaurants: string[]; // Array of slugs
 }
 
@@ -21,8 +24,10 @@ export interface RestaurantCard {
     reviewCount: number | null; // null if no reviews yet
     minBasket: number | null;
     deliveryTime: string | null;
+    deliveryTimeMinutes: number | null; // parsed max delivery time in minutes
     distance: number | null; // in km
     isSponsored: boolean;
+    promotions: string[]; // Array of promotion labels (e.g., "Ücretsiz Teslimat")
 }
 
 /**
@@ -34,6 +39,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
     maxMinBasket: null,
     minReviewCount: null,
     maxDistance: null,
+    maxDeliveryTime: null,
+    showOnlyPromotions: false,
+    hideSponsored: false,
     blockedRestaurants: [],
 };
 

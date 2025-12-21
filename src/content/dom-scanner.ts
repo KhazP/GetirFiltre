@@ -98,12 +98,16 @@ export function extractRestaurantData(element: HTMLElement): RestaurantCard | nu
 
         // Extract delivery time
         const deliveryTime = extractDeliveryTime(element);
+        const deliveryTimeMinutes = parseDeliveryTimeMinutes(deliveryTime);
 
         // Extract distance
         const distance = extractDistance(element);
 
-        // Check if sponsored
-        const isSponsored = element.textContent?.includes('Sponsorlu') || false;
+        // Check if sponsored - look for div with exact "Sponsorlu" text
+        const isSponsored = checkIsSponsored(element);
+
+        // Extract promotion badges (looks for indirim/ACIKTIYSAN patterns)
+        const promotions = extractPromotions(element);
 
         return {
             element,
@@ -113,8 +117,10 @@ export function extractRestaurantData(element: HTMLElement): RestaurantCard | nu
             reviewCount,
             minBasket,
             deliveryTime,
+            deliveryTimeMinutes,
             distance,
             isSponsored,
+            promotions,
         };
     } catch (error) {
         console.error('[GetirFiltre] Error extracting card data:', error);
@@ -229,4 +235,77 @@ function extractDeliveryTime(element: HTMLElement): string | null {
     }
 
     return null;
+}
+
+/**
+ * Parse delivery time string to get max minutes
+ * "25-35 dk" -> 35, "30 dk" -> 30
+ */
+function parseDeliveryTimeMinutes(deliveryTime: string | null): number | null {
+    if (!deliveryTime) return null;
+
+    // Match patterns like "25-35 dk" or "30 dk"
+    const rangeMatch = deliveryTime.match(/(\d+)-(\d+)/);
+    if (rangeMatch) {
+        // Return the max value from the range
+        return parseInt(rangeMatch[2], 10);
+    }
+
+    // Single number pattern
+    const singleMatch = deliveryTime.match(/(\d+)/);
+    if (singleMatch) {
+        return parseInt(singleMatch[1], 10);
+    }
+
+    return null;
+}
+
+/**
+ * Check if restaurant is sponsored
+ * Looks for a div element containing exactly "Sponsorlu" text
+ */
+function checkIsSponsored(element: HTMLElement): boolean {
+    // Find all divs and check for exact "Sponsorlu" text
+    const allDivs = element.querySelectorAll('div');
+    for (const div of allDivs) {
+        // Check if this div directly contains "Sponsorlu" text (not in children)
+        if (div.childNodes.length === 1 &&
+            div.childNodes[0].nodeType === Node.TEXT_NODE &&
+            div.textContent?.trim() === 'Sponsorlu') {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Extract promotion badges from restaurant card
+ * Only returns promotions that contain "indirim" or "ACIKTIYSAN" patterns
+ */
+function extractPromotions(element: HTMLElement): string[] {
+    const promotions: string[] = [];
+    const text = element.innerText || '';
+
+    // Check for "indirim" pattern (case-insensitive)
+    const indirimMatches = text.match(/[^\n]*indirim[^\n]*/gi);
+    if (indirimMatches) {
+        indirimMatches.forEach((match) => {
+            const cleaned = match.trim();
+            if (cleaned && !promotions.includes(cleaned)) {
+                promotions.push(cleaned);
+            }
+        });
+    }
+
+    // Check for "ACIKTIYSAN" promotional codes (with optional numbers)
+    const aciktiysanMatches = text.match(/ACIKTIYSAN\d*/gi);
+    if (aciktiysanMatches) {
+        aciktiysanMatches.forEach((match) => {
+            if (!promotions.includes(match)) {
+                promotions.push(match);
+            }
+        });
+    }
+
+    return promotions;
 }

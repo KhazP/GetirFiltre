@@ -13,6 +13,7 @@ export const SELECTORS = {
     RESTAURANT_NAME: 'p',
     DELIVERY_TIME: 'time',
     RATING_WRAPPER: 'div[class*="LabelWrapper"]',
+    PROMOTION_BADGE: '[data-testid="badge-label"]',
 } as const;
 
 /**

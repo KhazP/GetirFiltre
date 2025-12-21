@@ -198,6 +198,29 @@ export function processCards(cards: RestaurantCard[], settings: UserSettings): n
             }
         }
 
+        // Apply max delivery time filter
+        if (settings.maxDeliveryTime !== null && card.deliveryTimeMinutes !== null) {
+            if (card.deliveryTimeMinutes > settings.maxDeliveryTime) {
+                hideCard(card.element);
+                hiddenCount++;
+                return;
+            }
+        }
+
+        // Apply show only promotions filter
+        if (settings.showOnlyPromotions && card.promotions.length === 0) {
+            hideCard(card.element);
+            hiddenCount++;
+            return;
+        }
+
+        // Apply hide sponsored filter
+        if (settings.hideSponsored && card.isSponsored) {
+            hideCard(card.element);
+            hiddenCount++;
+            return;
+        }
+
         // Card passed filters - inject block button
         if (settings.isEnabled) {
             injectBlockButton(card);
