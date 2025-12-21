@@ -10,6 +10,7 @@ interface SettingsPageProps {
     onImport: (settings: UserSettings) => Promise<void>;
     onExport: () => void;
     onReset: () => void;
+    isTabMode?: boolean;
 }
 
 type SortOrder = 'az' | 'za' | 'recent';
@@ -22,6 +23,7 @@ export default function SettingsPage({
     onImport,
     onExport,
     onReset,
+    isTabMode = false,
 }: SettingsPageProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOrder, setSortOrder] = useState<SortOrder>('recent');
@@ -107,9 +109,9 @@ export default function SettingsPage({
     };
 
     return (
-        <div className="w-[320px] min-h-[400px] max-h-[600px] bg-gf-dark-900 text-white flex flex-col">
+        <div className="w-full h-full flex flex-col bg-gf-dark-900 text-white">
             {/* Header */}
-            <header className="bg-gf-dark-800 p-4 border-b border-gf-dark-600 flex items-center gap-3">
+            <header className="bg-gf-dark-800 p-4 border-b border-gf-dark-600 flex items-center gap-3 flex-shrink-0">
                 <button
                     onClick={onBack}
                     className="p-1.5 rounded-lg hover:bg-gf-dark-700 transition-colors"
@@ -123,7 +125,7 @@ export default function SettingsPage({
             {/* Content - Scrollable */}
             <main className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Blocked Restaurants Section */}
-                <section className="bg-gf-dark-800 rounded-lg overflow-hidden">
+                <section className="bg-gf-dark-800 rounded-lg overflow-hidden flex flex-col">
                     <div className="p-4 border-b border-gf-dark-600">
                         <div className="flex items-center justify-between mb-3">
                             <h2 className="font-medium flex items-center gap-2">
@@ -162,7 +164,7 @@ export default function SettingsPage({
                     </div>
 
                     {/* Restaurant List */}
-                    <div className="max-h-[200px] overflow-y-auto">
+                    <div className={isTabMode ? "max-h-[500px] overflow-y-auto" : "max-h-[200px] overflow-y-auto"}>
                         {filteredRestaurants.length === 0 ? (
                             <p className="p-4 text-sm text-gray-500 text-center">
                                 {searchQuery ? 'Sonuç bulunamadı' : 'Henüz engellenmiş restoran yok'}
@@ -291,7 +293,7 @@ export default function SettingsPage({
             </main>
 
             {/* Footer */}
-            <footer className="border-t border-gf-dark-600 p-3 text-center">
+            <footer className="border-t border-gf-dark-600 p-3 text-center flex-shrink-0">
                 <p className="text-xs text-gray-500">
                     GetirFiltre v1.0.0
                 </p>

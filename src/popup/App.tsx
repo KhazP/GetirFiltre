@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Settings, Trash2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
 import SettingsPage from './components/SettingsPage';
@@ -17,7 +17,15 @@ export default function App() {
         replaceSettings,
     } = useSettings();
 
-    const [currentPage, setCurrentPage] = useState<Page>('main');
+    // Check if running in full page mode (new tab)
+    const isTabMode = useMemo(() => new URLSearchParams(window.location.search).has('page'), []);
+
+    // Initialize page based on URL or default
+    const [currentPage, setCurrentPage] = useState<Page>(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('page') === 'settings' ? 'settings' : 'main';
+    });
+
     const [showBlocklist, setShowBlocklist] = useState(false);
 
     // Export settings as JSON file
@@ -33,9 +41,14 @@ export default function App() {
         });
         const url = URL.createObjectURL(blob);
 
+        // Format filename: GetirFiltreYedekYYYYMMDDHHmm.json
+        const now = new Date();
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
+
         const a = document.createElement('a');
         a.href = url;
-        a.download = `getirfiltre-ayarlar-${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `GetirFiltreYedek${timestamp}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -60,24 +73,20 @@ export default function App() {
         );
     }
 
-    // Settings Page
-    if (currentPage === 'settings') {
-        return (
-            <SettingsPage
-                settings={settings}
-                onBack={() => setCurrentPage('main')}
-                unblockRestaurant={unblockRestaurant}
-                clearBlocklist={clearBlocklist}
-                onImport={handleImport}
-                onExport={handleExport}
-                onReset={handleReset}
-            />
-        );
-    }
-
-    // Main Page
-    return (
-        <div className="w-[320px] min-h-[400px] bg-gf-dark-900 text-white">
+    // Determine content to render
+    const content = currentPage === 'settings' ? (
+        <SettingsPage
+            settings={settings}
+            onBack={() => setCurrentPage('main')}
+            unblockRestaurant={unblockRestaurant}
+            clearBlocklist={clearBlocklist}
+            onImport={handleImport}
+            onExport={handleExport}
+            onReset={handleReset}
+            isTabMode={isTabMode}
+        />
+    ) : (
+        <>
             {/* Header */}
             <header className="bg-gf-dark-800 p-4 border-b border-gf-dark-600">
                 <div className="flex items-center justify-between">
@@ -111,11 +120,21 @@ export default function App() {
                         </h1>
                     </button>
 
-                    {/* Settings Gear */}
+                    {/* Settings Gear - Open in New Tab if not in tab mode */}
                     <button
-                        onClick={() => setCurrentPage('settings')}
+                        onClick={() => {
+                            if (isTabMode) {
+                                setCurrentPage('settings');
+                            } else {
+                                if (chrome.tabs) {
+                                    chrome.tabs.create({ url: 'index.html?page=settings' });
+                                } else {
+                                    window.open('index.html?page=settings', '_blank');
+                                }
+                            }
+                        }}
                         className="p-2 rounded-lg hover:bg-gf-dark-700 transition-colors group"
-                        title="Ayarlar"
+                        title="Ayarlar (Yeni Sekmede aç)"
                     >
                         <Settings className="w-5 h-5 text-gray-400 group-hover:text-gf-accent-purple transition-colors" />
                     </button>
@@ -326,6 +345,25 @@ export default function App() {
                     Sayfa yenilendikten sonra değişiklikler aktif olur
                 </p>
             </footer>
+        </>
+    );
+
+    // Render Layout
+    if (isTabMode) {
+        return (
+            <div className="min-h-screen bg-gf-dark-950 flex justify-center pt-12 pb-12 text-white">
+                <div className="w-full max-w-2xl bg-gf-dark-900 rounded-xl shadow-2xl overflow-hidden border border-gf-dark-600 flex flex-col">
+                    {/* Render content directly in the box */}
+                    {content}
+                </div>
+            </div>
+        );
+    }
+
+    // Popup Layout
+    return (
+        <div className="w-[320px] min-h-[400px] bg-gf-dark-900 text-white flex flex-col">
+            {content}
         </div>
     );
 }
@@ -340,4 +378,3 @@ function formatSlug(slug: string): string {
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
 }
-
