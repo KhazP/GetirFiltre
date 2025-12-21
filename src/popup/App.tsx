@@ -350,10 +350,18 @@ export default function App() {
 
     // Render Layout
     if (isTabMode) {
+        if (currentPage === 'settings') {
+            return (
+                <div className="min-h-screen bg-gf-dark-950 text-white">
+                    {content}
+                </div>
+            );
+        }
+
+        // Main view in tab mode - keep centered card
         return (
             <div className="min-h-screen bg-gf-dark-950 flex justify-center pt-12 pb-12 text-white">
-                <div className="w-full max-w-2xl bg-gf-dark-900 rounded-xl shadow-2xl overflow-hidden border border-gf-dark-600 flex flex-col">
-                    {/* Render content directly in the box */}
+                <div className="w-full max-w-md bg-gf-dark-900 rounded-xl shadow-2xl overflow-hidden border border-gf-dark-600 flex flex-col h-fit">
                     {content}
                 </div>
             </div>
