@@ -9,18 +9,18 @@
     "file": "assets/index.tsx-loader-DkNaEZKj.js",
     "src": "_index.tsx-loader-DkNaEZKj.js"
   },
-  "_main-C1hdDm9N.css": {
-    "file": "assets/main-C1hdDm9N.css",
-    "src": "_main-C1hdDm9N.css"
+  "_main-CWMCco2N.css": {
+    "file": "assets/main-CWMCco2N.css",
+    "src": "_main-CWMCco2N.css"
   },
-  "_main-Du_Rswe9.js": {
-    "file": "assets/main-Du_Rswe9.js",
+  "_main-DzJCKcPT.js": {
+    "file": "assets/main-DzJCKcPT.js",
     "name": "main",
     "imports": [
       "_storage-CbNMpGo2.js"
     ],
     "css": [
-      "assets/main-C1hdDm9N.css"
+      "assets/main-CWMCco2N.css"
     ]
   },
   "_storage-CbNMpGo2.js": {
