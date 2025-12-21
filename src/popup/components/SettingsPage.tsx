@@ -1,10 +1,17 @@
-import { useState, useMemo, useRef, ChangeEvent } from 'react';
-import {
-    ArrowLeft, Search, Trash2, X, Download, Upload,
-    RotateCcw, ArrowUpDown, Filter, LayoutGrid, Shield, Save
-} from 'lucide-react';
-import { UserSettings, DEFAULT_SETTINGS } from '../../shared/types';
+import { ArrowLeft, Shield, Star, ShoppingBag, MessageSquare, MapPin, Clock, Layout, Save } from 'lucide-react';
+import { UserSettings } from '../../shared/types';
 import FilterSettings from './FilterSettings';
+import BentoGrid from './Bento/BentoGrid';
+import BentoCard from './Bento/BentoCard';
+import RatingFilterCard from './cards/RatingFilterCard';
+import BasketFilterCard from './cards/BasketFilterCard';
+import ReviewFilterCard from './cards/ReviewFilterCard';
+import DistanceFilterCard from './cards/DistanceFilterCard';
+import DeliveryFilterCard from './cards/DeliveryFilterCard';
+import TogglesCard from './cards/TogglesCard';
+import SectionVisibilityCard from './cards/SectionVisibilityCard';
+import BlockedRestaurantsCard from './cards/BlockedRestaurantsCard';
+import BackupCard from './cards/BackupCard';
 
 interface SettingsPageProps {
     settings: UserSettings;
@@ -18,9 +25,6 @@ interface SettingsPageProps {
     isTabMode?: boolean;
 }
 
-type SortOrder = 'az' | 'za' | 'recent';
-type SettingsTab = 'general' | 'filters' | 'blocked' | 'backup';
-
 export default function SettingsPage({
     settings,
     onBack,
@@ -32,341 +36,83 @@ export default function SettingsPage({
     updateSetting,
     isTabMode = false,
 }: SettingsPageProps) {
-    // State
-    const [activeTab, setActiveTab] = useState<SettingsTab>('filters');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [sortOrder, setSortOrder] = useState<SortOrder>('recent');
-    const [showResetConfirm, setShowResetConfirm] = useState(false);
-    const [importError, setImportError] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Filter logic for blocked restaurants
-    const filteredRestaurants = useMemo(() => {
-        let results = settings.blockedRestaurants.filter((slug) =>
-            formatSlug(slug).toLowerCase().includes(searchQuery.toLowerCase())
-        );
-
-        if (sortOrder === 'az') {
-            results = [...results].sort((a, b) =>
-                formatSlug(a).localeCompare(formatSlug(b), 'tr')
-            );
-        } else if (sortOrder === 'za') {
-            results = [...results].sort((a, b) =>
-                formatSlug(b).localeCompare(formatSlug(a), 'tr')
-            );
-        }
-        return results;
-    }, [settings.blockedRestaurants, searchQuery, sortOrder]);
-
-    // Helpers
-    const handleFileImport = async (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setImportError(null);
-
-        try {
-            const text = await file.text();
-            const data = JSON.parse(text);
-
-            if (!data.version || !data.settings) throw new Error('Geçersiz dosya formatı');
-
-            const importedSettings = data.settings as Partial<UserSettings>;
-            if (typeof importedSettings.isEnabled !== 'boolean') throw new Error('Ayarlar eksik veya hatalı');
-
-            const mergedSettings: UserSettings = { ...DEFAULT_SETTINGS, ...importedSettings };
-            await onImport(mergedSettings);
-        } catch (err) {
-            setImportError(err instanceof Error ? err.message : 'İçe aktarma başarısız');
-        }
-
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    const handleReset = () => {
-        onReset();
-        setShowResetConfirm(false);
-    };
-
-    const cycleSortOrder = () => {
-        setSortOrder((prev) => {
-            if (prev === 'recent') return 'az';
-            if (prev === 'az') return 'za';
-            return 'recent';
-        });
-    };
-
-    const getSortLabel = () => {
-        if (sortOrder === 'az') return 'A-Z';
-        if (sortOrder === 'za') return 'Z-A';
-        return 'Son Eklenen';
-    };
-
-    // --- Sub-Components ---
-
-    const Sidebar = () => (
-        <aside className="w-64 bg-gf-dark-900 border-r border-gf-dark-700 flex flex-col h-full">
-            <div className="p-6 border-b border-gf-dark-700 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gf-accent-purple to-violet-700 flex items-center justify-center shadow-lg shadow-gf-accent-purple/20">
-                    <Filter className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-bold text-lg tracking-tight text-white">GetirFiltre</span>
-            </div>
-
-            <nav className="flex-1 p-4 space-y-2">
-                <button
-                    onClick={() => setActiveTab('filters')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm
-                        ${activeTab === 'filters'
-                            ? 'bg-gf-accent-purple text-white shadow-lg shadow-gf-accent-purple/20'
-                            : 'text-gray-400 hover:bg-gf-dark-800 hover:text-gray-200'}`}
-                >
-                    <LayoutGrid className="w-5 h-5" />
-                    Filtre Ayarları
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('blocked')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm
-                        ${activeTab === 'blocked'
-                            ? 'bg-gf-accent-purple text-white shadow-lg shadow-gf-accent-purple/20'
-                            : 'text-gray-400 hover:bg-gf-dark-800 hover:text-gray-200'}`}
-                >
-                    <Shield className="w-5 h-5" />
-                    Engellenenler
-                    <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-mono
-                        ${activeTab === 'blocked' ? 'bg-white/20 text-white' : 'bg-gf-dark-700 text-gray-500'}`}>
-                        {settings.blockedRestaurants.length}
-                    </span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('backup')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm
-                        ${activeTab === 'backup'
-                            ? 'bg-gf-accent-purple text-white shadow-lg shadow-gf-accent-purple/20'
-                            : 'text-gray-400 hover:bg-gf-dark-800 hover:text-gray-200'}`}
-                >
-                    <Save className="w-5 h-5" />
-                    Yedekleme & Sıfırlama
-                </button>
-            </nav>
-
-            <div className="p-4 border-t border-gf-dark-700 text-center">
-                <p className="text-xs text-gray-600 font-mono">v1.0.0</p>
-            </div>
-        </aside>
-    );
-
-    // --- Tab Contents ---
-
-    const renderFiltersTab = () => (
-        <div className="max-w-2xl mx-auto space-y-8 animate-fadeIn">
-            <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Filtre Ayarları</h2>
-                <p className="text-gray-400 text-sm">Restoranları gizlemek için kriterleri belirleyin.</p>
-            </div>
-
-            <FilterSettings
-                settings={settings}
-                updateSetting={updateSetting}
-                disabled={!settings.isEnabled}
-            />
-        </div>
-    );
-
-    const renderBlockedTab = () => (
-        <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn h-full flex flex-col">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-white mb-2">Engellenen Restoranlar</h2>
-                    <p className="text-gray-400 text-sm">Gizlediğiniz restoranları yönetin.</p>
-                </div>
-                {settings.blockedRestaurants.length > 0 && (
-                    <button
-                        onClick={clearBlocklist}
-                        className="flex items-center gap-2 px-4 py-2 bg-gf-accent-red/10 text-gf-accent-red rounded-lg hover:bg-gf-accent-red/20 transition-colors text-sm font-medium"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        Listeyi Temizle
-                    </button>
-                )}
-            </div>
-
-            <div className="bg-gf-dark-800 rounded-xl p-4 flex gap-3 sticky top-0 z-10">
-                <div className="flex-1 relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-gf-accent-purple transition-colors" />
-                    <input
-                        type="text"
-                        placeholder="Restoran ara..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-gf-dark-700 border border-gf-dark-600 rounded-lg pl-10 pr-4 py-2.5
-                            text-sm placeholder-gray-500 text-gray-200
-                            focus:outline-none focus:border-gf-accent-purple focus:ring-1 focus:ring-gf-accent-purple transition-all"
-                    />
-                </div>
-                <button
-                    onClick={cycleSortOrder}
-                    className="flex items-center gap-2 px-4 py-2 bg-gf-dark-700 border border-gf-dark-600 
-                        rounded-lg text-sm text-gray-300 hover:bg-gf-dark-600 transition-all font-medium whitespace-nowrap"
-                >
-                    <ArrowUpDown className="w-4 h-4" />
-                    <span>{getSortLabel()}</span>
-                </button>
-            </div>
-
-            <div className="flex-1 bg-gf-dark-800 rounded-2xl border border-gf-dark-700 overflow-hidden flex flex-col min-h-[400px]">
-                {filteredRestaurants.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center flex-1 text-gray-500 gap-3 p-8">
-                        <Search className="w-12 h-12 opacity-20" />
-                        <p className="text-sm">
-                            {searchQuery ? 'Sonuç bulunamadı' : 'Listeniz tertemiz!'}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="overflow-y-auto flex-1 custom-scrollbar">
-                        <div className="divide-y divide-gf-dark-700">
-                            {filteredRestaurants.map((slug) => (
-                                <div
-                                    key={slug}
-                                    className="flex items-center justify-between px-6 py-4 hover:bg-gf-dark-700/50 transition-colors group"
-                                >
-                                    <span className="text-gray-300 font-medium truncate flex-1 mr-4">
-                                        {formatSlug(slug)}
-                                    </span>
-                                    <button
-                                        onClick={() => unblockRestaurant(slug)}
-                                        className="p-2 rounded-lg text-gray-500 hover:text-gf-accent-red hover:bg-gf-accent-red/10 transition-all opacity-0 group-hover:opacity-100"
-                                        title="Engeli kaldır"
-                                    >
-                                        <X className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-
-    const renderBackupTab = () => (
-        <div className="max-w-2xl mx-auto space-y-8 animate-fadeIn">
-            <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Yedekleme ve Sıfırlama</h2>
-                <p className="text-gray-400 text-sm">Ayarlarınızı kaydedin veya varsayılana döndürün.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button
-                    onClick={onExport}
-                    className="flex flex-col items-center justify-center gap-4 p-8
-                        bg-gf-dark-800 border-2 border-gf-dark-700 rounded-2xl
-                        hover:borer-gf-accent-purple/50 hover:bg-gf-dark-750 transition-all group text-left items-start"
-                >
-                    <div className="w-12 h-12 rounded-full bg-gf-dark-700 flex items-center justify-center group-hover:bg-gf-accent-purple/20 group-hover:text-gf-accent-purple transition-all">
-                        <Download className="w-6 h-6 text-gray-400 group-hover:text-gf-accent-purple" />
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-gray-200 mb-1">Dışa Aktar</h3>
-                        <p className="text-xs text-gray-500">Ayarları JSON dosyası olarak indir</p>
-                    </div>
-                </button>
-
-                <label className="cursor-pointer">
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".json"
-                        onChange={handleFileImport}
-                        className="hidden"
-                    />
-                    <div className="flex flex-col items-center justify-center gap-4 p-8
-                        bg-gf-dark-800 border-2 border-gf-dark-700 rounded-2xl h-full
-                        hover:border-gf-accent-purple/50 hover:bg-gf-dark-750 transition-all group text-left items-start"
-                    >
-                        <div className="w-12 h-12 rounded-full bg-gf-dark-700 flex items-center justify-center group-hover:bg-gf-accent-purple/20 group-hover:text-gf-accent-purple transition-all">
-                            <Upload className="w-6 h-6 text-gray-400 group-hover:text-gf-accent-purple" />
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-gray-200 mb-1">İçe Aktar</h3>
-                            <p className="text-xs text-gray-500">JSON dosyasından geri yükle</p>
-                        </div>
-                    </div>
-                </label>
-            </div>
-
-            {importError && (
-                <div className="p-4 bg-gf-accent-red/10 border border-gf-accent-red/20 rounded-xl flex items-center gap-3 text-gf-accent-red">
-                    <X className="w-5 h-5" />
-                    <p className="text-sm font-medium">{importError}</p>
-                </div>
-            )}
-
-            <div className="pt-8 border-t border-gf-dark-700">
-                <h3 className="text-lg font-semibold text-gray-200 mb-4 flex items-center gap-2">
-                    <RotateCcw className="w-5 h-5 text-gray-400" />
-                    Tehlikeli Bölge
-                </h3>
-
-                {showResetConfirm ? (
-                    <div className="p-6 bg-gf-accent-red/5 border border-gf-accent-red/20 rounded-2xl space-y-4">
-                        <p className="text-gray-300 font-medium text-center">
-                            Tüm ayarlarınız ve engellenen restoran listeniz silinecek. Emin misiniz?
-                        </p>
-                        <div className="flex gap-3 justify-center">
-                            <button
-                                onClick={() => setShowResetConfirm(false)}
-                                className="px-6 py-2 bg-gf-dark-700 rounded-lg text-sm text-gray-300 hover:bg-gf-dark-600 transition-colors"
-                            >
-                                Vazgeç
-                            </button>
-                            <button
-                                onClick={handleReset}
-                                className="px-6 py-2 bg-gf-accent-red text-white rounded-lg text-sm hover:bg-gf-accent-red/90 transition-colors shadow-lg shadow-gf-accent-red/20"
-                            >
-                                Evet, Sıfırla
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => setShowResetConfirm(true)}
-                        className="w-full flex items-center justify-between px-6 py-4
-                            bg-gf-dark-800 border border-gf-dark-700 rounded-2xl
-                            hover:bg-gf-accent-red/5 hover:border-gf-accent-red/30 hover:text-gf-accent-red transition-all group"
-                    >
-                        <div className="text-left">
-                            <span className="block font-medium text-gray-300 group-hover:text-gf-accent-red transition-colors">Varsayılana Sıfırla</span>
-                            <span className="text-xs text-gray-500">Tüm verileri siler ve başlangıç ayarlarına döner</span>
-                        </div>
-                        <RotateCcw className="w-5 h-5 text-gray-500 group-hover:text-gf-accent-red transition-colors" />
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-
-
-    // --- Render ---
-
+    // --- Full Page Bento Layout ---
     if (isTabMode) {
         return (
-            <div className="flex min-h-screen bg-gf-dark-950 text-white font-sans">
-                <Sidebar />
-                <main className="flex-1 h-screen overflow-y-auto bg-gf-dark-950">
-                    <div className="p-8 pb-20 min-h-full">
-                        {activeTab === 'filters' && renderFiltersTab()}
-                        {activeTab === 'blocked' && renderBlockedTab()}
-                        {activeTab === 'backup' && renderBackupTab()}
-                    </div>
-                </main>
+            <div className="min-h-screen bg-gf-dark-950 text-white font-sans p-8 pb-20 overflow-y-auto">
+                <div className="max-w-[1400px] mx-auto space-y-8">
+                    {/* Header */}
+                    <header className="flex items-center gap-4 mb-8">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gf-accent-purple to-violet-700 flex items-center justify-center shadow-lg shadow-gf-accent-purple/20">
+                            <Shield className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                                GetirFiltre Ayarları
+                            </h1>
+                            <p className="text-gray-400">Tüm filtrelerinizi tek bir yerden yönetin.</p>
+                        </div>
+                    </header>
+
+                    {/* Dashboard Grid */}
+                    <BentoGrid>
+                        {/* Row 1: Primary Numeric Filters */}
+                        <BentoCard title="Minimum Puan" description="Bu puanın altındaki restoranlar gizlenir" icon={<Star className="w-5 h-5 text-yellow-500" />}>
+                            <RatingFilterCard settings={settings} updateSetting={updateSetting} disabled={!settings.isEnabled} variant="default" />
+                        </BentoCard>
+                        <BentoCard title="Maksimum Sepet Limiti" description="Bu limiti aşan minimum sepet tutarları gizlenir" icon={<ShoppingBag className="w-5 h-5 text-gf-accent-purple" />}>
+                            <BasketFilterCard settings={settings} updateSetting={updateSetting} disabled={!settings.isEnabled} variant="default" />
+                        </BentoCard>
+                        <BentoCard title="Minimum Değerlendirme" description="Restoranın minimum yorum sayısı" icon={<MessageSquare className="w-5 h-5 text-blue-400" />}>
+                            <ReviewFilterCard settings={settings} updateSetting={updateSetting} disabled={!settings.isEnabled} variant="default" />
+                        </BentoCard>
+                        <BentoCard title="Maksimum Süre" description="Maksimum teslimat süresi" icon={<Clock className="w-5 h-5 text-orange-400" />}>
+                            <DeliveryFilterCard settings={settings} updateSetting={updateSetting} disabled={!settings.isEnabled} variant="default" />
+                        </BentoCard>
+
+                        {/* Row 2: Large Panels & Toggles */}
+                        <BentoCard
+                            title="Engellenen Restoranlar"
+                            description={`${settings.blockedRestaurants.length} restoran engellendi`}
+                            icon={<Shield className="w-5 h-5 text-red-500" />}
+                            className="md:col-span-2 md:row-span-2"
+                        >
+                            <BlockedRestaurantsCard
+                                settings={settings}
+                                unblockRestaurant={unblockRestaurant}
+                                clearBlocklist={clearBlocklist}
+                            />
+                        </BentoCard>
+
+                        <div className="col-span-1 md:col-span-2 space-y-4 h-full flex flex-col">
+                            <BentoCard title="Diğer Filtreler" description="Ek filtreleme seçenekleri">
+                                <TogglesCard settings={settings} updateSetting={updateSetting} disabled={!settings.isEnabled} variant="default" />
+                            </BentoCard>
+                            <BentoCard title="Maksimum Mesafe" description="Bu mesafeden uzak olanlar gizlenir" icon={<MapPin className="w-5 h-5 text-red-400" />}>
+                                <DistanceFilterCard settings={settings} updateSetting={updateSetting} disabled={!settings.isEnabled} variant="default" />
+                            </BentoCard>
+                        </div>
+
+                        {/* Row 3: Admin / Section Visibility */}
+                        <BentoCard title="Görünüm Ayarları" description="Sayfa bölümlerini gizle/göster" icon={<Layout className="w-5 h-5 text-purple-400" />} className="md:col-span-2">
+                            <SectionVisibilityCard settings={settings} updateSetting={updateSetting} disabled={!settings.isEnabled} variant="default" />
+                        </BentoCard>
+
+                        <BentoCard title="Sistem" description="Yedekleme ve sıfırlama" icon={<Save className="w-5 h-5 text-green-400" />} className="md:col-span-2">
+                            <BackupCard onExport={onExport} onImport={onImport} onReset={onReset} />
+                        </BentoCard>
+                    </BentoGrid>
+
+                    <footer className="text-center text-gray-500 text-sm mt-12">
+                        Değişiklikler anında kaydedilir ✨ • v1.0.0
+                    </footer>
+                </div>
             </div>
         );
     }
 
-    // Legacy Popup Mode (Simplified)
+
+    // --- Legacy Popup Mode (Simplified List) ---
     return (
         <div className="w-full h-full flex flex-col bg-gf-dark-900 text-white">
             <header className="p-4 border-b border-gf-dark-600 flex items-center gap-3 bg-gf-dark-900 sticky top-0 z-10">
@@ -380,18 +126,18 @@ export default function SettingsPage({
             </header>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                {/* Compact Filters */}
                 <FilterSettings
                     settings={settings}
                     updateSetting={updateSetting}
                     disabled={!settings.isEnabled}
+                    variant="compact"
                 />
 
-                {/* Link to full settings */}
                 <div className="p-4 bg-gf-dark-800 rounded-xl border border-gf-dark-700 text-center space-y-3">
                     <Shield className="w-8 h-8 text-gf-accent-purple mx-auto opacity-50" />
                     <p className="text-sm text-gray-400">
-                        Engellenenler ve gelişmiş ayarlar için tam ekran moduna geçin.
+                        Bu pencere sadece hızlı ayarlar içindir.
+                        Engellenenler ve gelişmiş yönetim için panelinizi kullanın.
                     </p>
                     <button
                         onClick={() => {
@@ -401,9 +147,9 @@ export default function SettingsPage({
                                 window.open('index.html?page=settings', '_blank');
                             }
                         }}
-                        className="text-gf-accent-purple text-sm font-medium hover:underline"
+                        className="w-full py-2 bg-gf-accent-purple/10 text-gf-accent-purple rounded-lg text-sm font-medium hover:bg-gf-accent-purple/20 transition-colors"
                     >
-                        Ayarları Yeni Sekmede Aç
+                        Tam Ekran Panelini Aç
                     </button>
                 </div>
             </div>
@@ -411,13 +157,4 @@ export default function SettingsPage({
     );
 }
 
-/**
- * Format slug for display
- */
-function formatSlug(slug: string): string {
-    return slug
-        .split('-')
-        .slice(0, 3)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-}
+// Helper removed as it's not used in this file anymore (moved to BlockedRestaurantsCard)
