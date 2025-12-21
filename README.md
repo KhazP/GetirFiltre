@@ -25,7 +25,7 @@
 
 1. **Depoyu kopyalayın**
    ```bash
-   git clone https://github.com/alpya/GetirFiltre.git
+   git clone https://github.com/USERNAME/GetirFiltre.git
    cd GetirFiltre
    ```
 
