@@ -148,6 +148,43 @@ export default function App() {
 
             {/* Main Content */}
             <main className="p-4 space-y-4">
+                {/* Quick Toggle */}
+                <div
+                    className={`
+                        bg-gf-dark-800 rounded-lg p-4 flex items-center justify-between
+                        border-2 transition-all duration-200
+                        ${settings.isEnabled
+                            ? 'border-gf-accent-purple/30'
+                            : 'border-gf-dark-600'
+                        }
+                    `}
+                >
+                    <div>
+                        <h3 className="font-medium text-white">Filtre Durumu</h3>
+                        <p className={`text-xs ${settings.isEnabled ? 'text-gf-accent-purple' : 'text-gray-500'}`}>
+                            {settings.isEnabled ? 'Filtreler aktif' : 'Filtreler kapalı'}
+                        </p>
+                    </div>
+                    <button
+                        onClick={toggleEnabled}
+                        className={`
+                            relative w-14 h-8 rounded-full transition-all duration-300 
+                            ${settings.isEnabled
+                                ? 'bg-gf-accent-purple shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+                                : 'bg-gf-dark-600'
+                            }
+                        `}
+                    >
+                        <span
+                            className={`
+                                absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md
+                                transition-transform duration-300 ease-out
+                                ${settings.isEnabled ? 'translate-x-6' : 'translate-x-0'}
+                            `}
+                        />
+                    </button>
+                </div>
+
                 <FilterSettings
                     settings={settings}
                     updateSetting={updateSetting}
@@ -225,7 +262,7 @@ export default function App() {
             {/* Footer */}
             <footer className="border-t border-gf-dark-600 p-3 text-center">
                 <p className="text-xs text-gray-500">
-                    Sayfa yenilendikten sonra değişiklikler aktif olur
+                    Değişiklikler anında aktif olur ✨
                 </p>
             </footer>
         </>

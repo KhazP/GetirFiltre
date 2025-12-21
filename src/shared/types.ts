@@ -10,6 +10,10 @@ export interface UserSettings {
     maxDeliveryTime: number | null; // in minutes
     showOnlyPromotions: boolean; // show only restaurants with active deals
     hideSponsored: boolean; // hide sponsored restaurants
+    // Section visibility
+    hideCampaignCarousel: boolean; // hide top campaign carousel
+    hideMudavimSection: boolean; // hide "GetirYemek Müdavim" section
+    hideAciktiysanSection: boolean; // hide "ACIKTIYSAN" promotion section
     blockedRestaurants: string[]; // Array of slugs
 }
 
@@ -42,6 +46,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
     maxDeliveryTime: null,
     showOnlyPromotions: false,
     hideSponsored: false,
+    hideCampaignCarousel: false,
+    hideMudavimSection: false,
+    hideAciktiysanSection: false,
     blockedRestaurants: [],
 };
 

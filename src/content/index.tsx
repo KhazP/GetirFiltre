@@ -100,6 +100,39 @@ function injectStyles(): void {
 // Current settings cache
 let currentSettings: UserSettings | null = null;
 let isInitialized = false;
+let totalHiddenCount = 0; // Track total hidden restaurants for badge
+
+/**
+ * Listen for direct messages from popup for instant updates
+ */
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.type === 'SETTINGS_UPDATED' && message.settings) {
+        console.log('[GetirFiltre] Received settings update from popup');
+        currentSettings = message.settings;
+
+        // Apply changes immediately
+        manageSectionVisibility(message.settings);
+        reEvaluateAllCards(message.settings);
+
+        sendResponse({ success: true });
+    }
+    return true; // Keep channel open for async response
+});
+
+/**
+ * Send badge update to background script
+ */
+function sendBadgeUpdate(): void {
+    try {
+        chrome.runtime.sendMessage({
+            type: 'UPDATE_BADGE',
+            hiddenCount: totalHiddenCount,
+            isEnabled: currentSettings?.isEnabled ?? true,
+        });
+    } catch (error) {
+        // Ignore errors (e.g., extension context invalidated)
+    }
+}
 
 /**
  * Debounce function
@@ -116,10 +149,51 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T 
 }
 
 /**
+ * Manage visibility of page sections (carousels, promo sections)
+ */
+function manageSectionVisibility(settings: UserSettings): void {
+    // Hide/show top campaign carousel (first carousel that's not inside a card)
+    const topCarousels = document.querySelectorAll('div[data-testid="carousel"]');
+    const topCarousel = topCarousels[0] as HTMLElement | undefined;
+    if (topCarousel && !topCarousel.closest('div[data-testid="card"]')) {
+        topCarousel.style.display = settings.hideCampaignCarousel ? 'none' : '';
+    }
+
+    // Find Müdavim and ACIKTIYSAN sections by their card containers
+    // These are div[data-testid="card"] elements containing H5 headers with specific text
+    const allCards = document.querySelectorAll<HTMLElement>('div[data-testid="card"]');
+
+    allCards.forEach((card) => {
+        const h5 = card.querySelector('h5[data-testid="title"]');
+        if (!h5) return;
+
+        const text = h5.textContent || '';
+
+        // Müdavim section
+        if (text.includes('Müdavim')) {
+            card.style.display = settings.hideMudavimSection ? 'none' : '';
+        }
+        // ACIKTIYSAN section  
+        else if (text.includes('ACIKTIYSAN')) {
+            card.style.display = settings.hideAciktiysanSection ? 'none' : '';
+        }
+    });
+}
+
+/**
  * Main processing function
  */
 function runFilter(): void {
-    if (!currentSettings || !currentSettings.isEnabled) {
+    if (!currentSettings) {
+        return;
+    }
+
+    // Always manage section visibility (even when filters are disabled)
+    manageSectionVisibility(currentSettings);
+
+    if (!currentSettings.isEnabled) {
+        totalHiddenCount = 0;
+        sendBadgeUpdate();
         return;
     }
 
@@ -127,11 +201,14 @@ function runFilter(): void {
 
     if (cards.length > 0) {
         const hiddenCount = processCards(cards, currentSettings);
+        totalHiddenCount = document.querySelectorAll('.getirfiltre-hidden').length;
 
         if (hiddenCount > 0) {
-            console.log(`[GetirFiltre] Processed ${cards.length} cards, hid ${hiddenCount}`);
+            console.log(`[GetirFiltre] Processed ${cards.length} cards, hid ${hiddenCount}, total hidden: ${totalHiddenCount}`);
         }
     }
+
+    sendBadgeUpdate();
 }
 
 // Debounced version
@@ -139,22 +216,26 @@ const debouncedRunFilter = debounce(runFilter, TIMING.DEBOUNCE_MS);
 
 /**
  * Re-evaluate all processed cards when settings change
- * This allows instant un-hiding when restaurants are unblocked
+ * This allows instant show/hide when any filter value changes
  */
-function reEvaluateAllCards(newSettings: UserSettings, oldSettings: UserSettings | null): void {
+function reEvaluateAllCards(newSettings: UserSettings): void {
     // If extension is disabled, show all hidden cards
     if (!newSettings.isEnabled) {
         const hiddenCards = document.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.HIDDEN}`);
         hiddenCards.forEach((el) => showCard(el));
         console.log(`[GetirFiltre] Disabled - showed ${hiddenCards.length} cards`);
+        totalHiddenCount = 0;
+        sendBadgeUpdate();
         return;
     }
 
     // Find all processed cards (including hidden ones)
     const processedCards = document.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.PROCESSED}`);
+    let showCount = 0;
+    let hideCount = 0;
 
     processedCards.forEach((element) => {
-        // Extract slug from the card's restaurant link
+        // Extract data from the card to check filters
         const link = element.querySelector<HTMLAnchorElement>('a[href*="/yemek/restoran/"]');
         if (!link) return;
 
@@ -166,24 +247,109 @@ function reEvaluateAllCards(newSettings: UserSettings, oldSettings: UserSettings
 
         const slug = slugMatch[1];
 
-        // Check if this card should be visible
-        const isBlocked = newSettings.blockedRestaurants.includes(slug);
-        const wasBlocked = oldSettings?.blockedRestaurants.includes(slug) ?? false;
+        // Check if this card should be hidden
+        let shouldHide = false;
 
-        // If unblocked, show the card
-        if (wasBlocked && !isBlocked) {
-            showCard(element);
-            console.log(`[GetirFiltre] Unblocked: ${slug}`);
+        // Check blocklist
+        if (newSettings.blockedRestaurants.includes(slug)) {
+            shouldHide = true;
         }
-        // If newly blocked, hide the card
-        else if (!wasBlocked && isBlocked) {
+
+        // Check other filters by re-extracting data
+        if (!shouldHide) {
+            // Re-extract card data for filter checks
+            const cardText = element.innerText || '';
+
+            // Rating check
+            if (newSettings.minRating !== null) {
+                const ratingMatch = cardText.match(/(\d\.\d)\s*\(\d/);
+                if (ratingMatch) {
+                    const rating = parseFloat(ratingMatch[1]);
+                    if (rating < newSettings.minRating) {
+                        shouldHide = true;
+                    }
+                }
+            }
+
+            // Min basket check
+            if (!shouldHide && newSettings.maxMinBasket !== null) {
+                const minBasketMatch = cardText.match(/Min\.\s*₺?(\d+)/i);
+                if (minBasketMatch) {
+                    const minBasket = parseInt(minBasketMatch[1], 10);
+                    if (minBasket > newSettings.maxMinBasket) {
+                        shouldHide = true;
+                    }
+                }
+            }
+
+            // Distance check
+            if (!shouldHide && newSettings.maxDistance !== null) {
+                const distanceMatch = cardText.match(/(?:^|[\s\n])(\d+[,.]?\d*)\s*km/i);
+                if (distanceMatch) {
+                    const distance = parseFloat(distanceMatch[1].replace(',', '.'));
+                    if (distance > newSettings.maxDistance) {
+                        shouldHide = true;
+                    }
+                }
+            }
+
+            // Delivery time check
+            if (!shouldHide && newSettings.maxDeliveryTime !== null) {
+                const timeMatch = cardText.match(/(\d+)-?(\d+)?\s*dk/);
+                if (timeMatch) {
+                    // Use max time from range (e.g., "25-35 dk" -> 35)
+                    const deliveryTime = timeMatch[2] ? parseInt(timeMatch[2], 10) : parseInt(timeMatch[1], 10);
+                    if (deliveryTime > newSettings.maxDeliveryTime) {
+                        shouldHide = true;
+                    }
+                }
+            }
+
+            // Review count check  
+            if (!shouldHide && newSettings.minReviewCount !== null) {
+                const reviewMatch = cardText.match(/\((\d+)\+?\)/);
+                if (reviewMatch) {
+                    const reviewCount = parseInt(reviewMatch[1], 10);
+                    if (reviewCount < newSettings.minReviewCount) {
+                        shouldHide = true;
+                    }
+                }
+            }
+
+            // Sponsored check
+            if (!shouldHide && newSettings.hideSponsored) {
+                if (cardText.includes('Sponsorlu')) {
+                    shouldHide = true;
+                }
+            }
+
+            // Promotions only check
+            if (!shouldHide && newSettings.showOnlyPromotions) {
+                if (!cardText.toLowerCase().includes('indirim') && !cardText.includes('ACIKTIYSAN')) {
+                    shouldHide = true;
+                }
+            }
+        }
+
+        // Apply visibility change
+        const isCurrentlyHidden = element.classList.contains(CSS_CLASSES.HIDDEN);
+
+        if (shouldHide && !isCurrentlyHidden) {
             hideCard(element);
-            console.log(`[GetirFiltre] Blocked: ${slug}`);
+            hideCount++;
+        } else if (!shouldHide && isCurrentlyHidden) {
+            showCard(element);
+            showCount++;
         }
     });
 
-    // Also run the standard filter for any new cards
-    runFilter();
+    if (showCount > 0 || hideCount > 0) {
+        console.log(`[GetirFiltre] Re-evaluated: showed ${showCount}, hid ${hideCount} cards`);
+    }
+
+    // Update badge with current hidden count
+    totalHiddenCount = document.querySelectorAll(`.${CSS_CLASSES.HIDDEN}`).length;
+    sendBadgeUpdate();
 }
 
 /**
@@ -350,11 +516,13 @@ async function init(): Promise<void> {
     // Listen for settings changes (for listings page)
     storage.onSettingsChange((newSettings) => {
         console.log('[GetirFiltre] Settings updated:', newSettings);
-        const oldSettings = currentSettings;
         currentSettings = newSettings;
 
+        // Handle section visibility immediately (Campaign/Müdavim/ACIKTIYSAN toggles)
+        manageSectionVisibility(newSettings);
+
         // Re-evaluate all cards for instant show/hide
-        reEvaluateAllCards(newSettings, oldSettings);
+        reEvaluateAllCards(newSettings);
     });
 
     // Initial run

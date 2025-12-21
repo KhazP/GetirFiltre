@@ -29,7 +29,30 @@ export function useSettings() {
         const newSettings = { ...settings, [key]: value };
         setSettings(newSettings);
         await storage.saveSettings(newSettings);
+
+        // Notify content script directly for instant updates
+        notifyContentScript(newSettings);
     };
+
+    /**
+     * Send settings to active GetirYemek tab for instant updates
+     */
+    async function notifyContentScript(settings: UserSettings): Promise<void> {
+        try {
+            // Get the active tab
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tab?.id && tab.url?.includes('getir.com/yemek')) {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: 'SETTINGS_UPDATED',
+                    settings: settings,
+                }).catch(() => {
+                    // Tab may not have content script loaded - ignore
+                });
+            }
+        } catch (error) {
+            // Popup might not have tabs permission in all contexts - ignore
+        }
+    }
 
     // Toggle enabled
     const toggleEnabled = () => updateSetting('isEnabled', !settings.isEnabled);
@@ -53,6 +76,7 @@ export function useSettings() {
     const replaceSettings = async (newSettings: UserSettings) => {
         setSettings(newSettings);
         await storage.saveSettings(newSettings);
+        notifyContentScript(newSettings);
     };
 
     return {

@@ -225,6 +225,86 @@ export default function FilterSettings({
                     </button>
                 </div>
             </div>
+
+            {/* Section Visibility */}
+            <div className="bg-gf-dark-800 rounded-lg p-4 space-y-3">
+                <h3 className="text-sm font-medium text-gray-300 mb-3">Sayfa Bölümleri</h3>
+
+                {/* Hide Campaign Carousel Toggle */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <span className="text-sm text-gray-300">Kampanya Gizle</span>
+                        <p className="text-xs text-gray-500">
+                            Üst kampanya karuselini gizle
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => updateSetting('hideCampaignCarousel', !settings.hideCampaignCarousel)}
+                        className={`
+                            relative w-11 h-6 rounded-full transition-colors
+                            ${settings.hideCampaignCarousel ? 'bg-gf-accent-purple' : 'bg-gf-dark-600'}
+                            cursor-pointer
+                        `}
+                    >
+                        <span
+                            className={`
+                                absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
+                                ${settings.hideCampaignCarousel ? 'translate-x-5' : 'translate-x-0'}
+                            `}
+                        />
+                    </button>
+                </div>
+
+                {/* Hide Müdavim Section Toggle */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <span className="text-sm text-gray-300">Müdavim Gizle</span>
+                        <p className="text-xs text-gray-500">
+                            GetirYemek Müdavim bölümünü gizle
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => updateSetting('hideMudavimSection', !settings.hideMudavimSection)}
+                        className={`
+                            relative w-11 h-6 rounded-full transition-colors
+                            ${settings.hideMudavimSection ? 'bg-gf-accent-purple' : 'bg-gf-dark-600'}
+                            cursor-pointer
+                        `}
+                    >
+                        <span
+                            className={`
+                                absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
+                                ${settings.hideMudavimSection ? 'translate-x-5' : 'translate-x-0'}
+                            `}
+                        />
+                    </button>
+                </div>
+
+                {/* Hide ACIKTIYSAN Section Toggle */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <span className="text-sm text-gray-300">ACIKTIYSAN Gizle</span>
+                        <p className="text-xs text-gray-500">
+                            ACIKTIYSAN bölümünü gizle
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => updateSetting('hideAciktiysanSection', !settings.hideAciktiysanSection)}
+                        className={`
+                            relative w-11 h-6 rounded-full transition-colors
+                            ${settings.hideAciktiysanSection ? 'bg-gf-accent-purple' : 'bg-gf-dark-600'}
+                            cursor-pointer
+                        `}
+                    >
+                        <span
+                            className={`
+                                absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
+                                ${settings.hideAciktiysanSection ? 'translate-x-5' : 'translate-x-0'}
+                            `}
+                        />
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
