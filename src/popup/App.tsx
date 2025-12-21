@@ -345,7 +345,7 @@ export default function App() {
 
             {/* Footer */}
             <footer className="border-t border-gf-dark-600 px-3 py-2 text-center mt-auto">
-                <p className="text-[10px] text-gray-500">Anında aktif ✨</p>
+                <p className="text-[10px] text-gray-500">💡 Detaylı bilgi kutuların üzerine fare'yi tutun</p>
             </footer>
         </>
     );
@@ -361,9 +361,9 @@ export default function App() {
         );
     }
 
-    // Popup layout
+    // Popup layout - centered
     return (
-        <div className="w-[340px] bg-gf-dark-900 text-white flex flex-col">
+        <div className="w-[340px] bg-gf-dark-900 text-white flex flex-col mx-auto">
             {content}
         </div>
     );
