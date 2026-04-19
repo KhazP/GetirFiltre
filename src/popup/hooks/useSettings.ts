@@ -49,7 +49,7 @@ export function useSettings() {
                     // Tab may not have content script loaded - ignore
                 });
             }
-        } catch (error) {
+        } catch {
             // Popup might not have tabs permission in all contexts - ignore
         }
     }

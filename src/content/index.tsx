@@ -129,7 +129,7 @@ function sendBadgeUpdate(): void {
             hiddenCount: totalHiddenCount,
             isEnabled: currentSettings?.isEnabled ?? true,
         });
-    } catch (error) {
+    } catch {
         // Ignore errors (e.g., extension context invalidated)
     }
 }

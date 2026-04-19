@@ -18,6 +18,14 @@ export interface UserSettings {
 }
 
 /**
+ * Typed settings updater used across popup/options components
+ */
+export type UpdateSetting = <K extends keyof UserSettings>(
+    key: K,
+    value: UserSettings[K]
+) => Promise<void>;
+
+/**
  * Restaurant data extracted from DOM
  */
 export interface RestaurantCard {

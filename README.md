@@ -18,6 +18,11 @@ GetirYemek için God Mode: sevmediğiniz restoranları kalıcı olarak engelleyi
 
 ## Kurulum (geliştirici modu)
 
+### Önkoşullar
+
+- Node.js 20+
+- npm 10+
+
 ```bash
 git clone https://github.com/KhazP/GetirFiltre.git
 cd GetirFiltre
@@ -42,7 +47,20 @@ Ardından https://getir.com/yemek/restoranlar/ adresinde uzantı ikonundan filtr
 ```bash
 npm run dev    # Vite + CRX HMR
 npm run build  # Üretim derlemesi
+npm run test   # Birim testleri
 ```
+
+## Yazılım Gereksinimleri
+
+- Runtime ve bağımlılıklar: `package.json`
+- Kilitli sürümler: `package-lock.json`
+- TypeScript yapılandırması: `tsconfig.json`
+
+## Dependency ve Katkı Teşekkürü
+
+- React, TypeScript, Vite, CRXJS ve Tailwind topluluklarına teşekkürler.
+- Katkı akışı ve davranış kuralları: `docs/CONTRIBUTING.md`, `docs/CODE_OF_CONDUCT.md`
+- Güvenlik bildirimi: `docs/SECURITY.md`
 
 ## Klasörler
 
