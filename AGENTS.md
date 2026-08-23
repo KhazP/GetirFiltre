@@ -1,133 +1,80 @@
-Here is the comprehensive `AGENTS.md` file, optimized for AI coding assistants (Cursor, Windsurf, Copilot) to build **GetirFiltre**.
+# Agent Guidance
 
-```markdown
-# AGENTS.md
+**GetirFiltre** is a Manifest V3 Chrome extension for Turkish food-delivery
+sites — **GetirYemek** (`getir.com/yemek`) and **Uber Eats Trendyol Go**
+(`tgoyemek.com`). It lets users permanently blacklist restaurants and apply
+persistent filters (rating, price, distance) to stop doom-scrolling.
 
-> **System Prompt:** This file serves as the "Universal Brain" for this project. All AI agents must strictly adhere to the technical constraints, architectural patterns, and persona guidelines defined below.
+The extension is **built** — `src/{background,content,popup,options,shared}`
+exist. Treat this as a working codebase, not a greenfield spec.
 
----
+## Platform adapters
 
-## 1. Project Mission
-Build **GetirFiltre**, a high-performance Chrome Extension that acts as a "God Mode" for GetirYemek, allowing users to permanently blacklist restaurants and apply advanced, persistent filters (Rating, Price, Distance) to cure "doom scrolling."
+Every site-specific assumption lives in `src/content/platforms/` behind the
+`PlatformAdapter` interface: URL shapes, card lookup, field parsing, section
+hiding, the mutation hint and the hover CSS. The content script is
+site-agnostic — **add a site by adding an adapter**, never by branching on the
+hostname in `index.tsx`.
 
----
+- One filter decision, one place: `shouldHideCard()` in `card-manipulator.ts`.
+  First pass and re-evaluation after a settings change both go through it, so
+  the rules cannot drift apart.
+- Blocklist entries are **storage keys**, not raw slugs: bare slug on Getir
+  (legacy data), `tgo:<id>` elsewhere. Numeric ids are unreadable, so the
+  display name is kept in `blockedNames`.
+- Number formats differ per site. Trendyol Go writes `Min. 2.000 TL` (dot =
+  thousands separator), `30-40dk`, and renders sub-kilometre distances as
+  `0.5m`. Never reuse another platform's regex without checking it live.
 
-## 2. Persona & Interaction Guidelines (Persona: Senior Architect)
-**Role:** You are a Senior Full-Stack Engineer and Chrome Extension Specialist.
-**User:** The user is a Senior Developer ("Cem"). They value efficiency and technical accuracy over explanations.
+## The one hard problem: the host DOM is hostile
 
-*   **Tone:** Concise, professional, direct. No fluff.
-*   **Response Style:** Show, don't tell. Provide code blocks immediately. Do not explain basic React/TS concepts unless asked.
-*   **Critical Thinking:** Anticipate edge cases (e.g., Getir changing DOM classes, infinite scrolling, race conditions).
-*   **Vibe:** "Hacker Minimalist." Code should be pragmatic, performant, and clean.
+Everything below exists because the host page fights the extension.
 
----
+- **Class names are obfuscated and dynamic** (`.style__Card-sc...`) and they
+  change without notice. **Never key off a class hash alone.** Match on
+  structure or attributes instead — e.g. "the `div` containing an `img` and a
+  price-formatted string". A selector that works today is not a selector that
+  works next week. Trendyol Go is kinder: it tags card fields with `id`
+  attributes (`#distance`, `#min-basket-price`), but the ids repeat on every
+  card — query them **inside** the card, never with `getElementById`.
+- **It's a SPA with infinite scroll**, so cards appear after load. One
+  `MutationObserver` at the root of the feed container, and **debounce the
+  processing** — running per-mutation freezes the page during a scroll.
+- **Injected elements must not fight React's hydration.** Append a plain DOM
+  node with a unique ID, or use a React Portal — never render into a node the
+  host owns.
+- **Z-index war:** injected UI must sit above cards but must never cover Getir's
+  own critical UI, especially the cart.
+- **Tailwind must not bleed into the host page.** CRXJS scopes it, but verify
+  when adding global styles.
 
-## 3. Tech Stack & Standards
-**Strictly** use the following technologies. Do not introduce alternatives without user permission.
+## Failure policy
 
-| Category | Technology | Reasoning |
-| :--- | :--- | :--- |
-| **Core** | **React 18+** (Functional) | Component-based UI for the Popup and Overlay elements. |
-| **Language** | **TypeScript** (Strict) | Mandatory for type safety and preventing runtime errors. |
-| **Build Tool** | **Vite** + **CRXJS Plugin** | Enables HMR for content scripts and fast builds. |
-| **Styling** | **Tailwind CSS** | Utility-first, easy dark mode, small bundle size. |
-| **State** | **React Context** + **Chrome Storage** | `chrome.storage.sync` for persistence. No Redux/Zustand needed for MVP. |
-| **Icons** | **Lucide React** | Clean, minimalist SVG icons. |
-| **DOM Logic** | **MutationObserver** | Required to handle Getir's Single Page Application (SPA) behavior. |
+**A parse failure must never break the Getir page.** Wrap content-script entry
+points in `try/catch` and log a discreet warning instead of throwing — a broken
+extension that leaves the site usable is a bug; one that takes the site down is
+an incident. Handle `chrome.runtime.lastError` explicitly.
 
----
+## State
 
-## 4. Project Structure
-Maintain this separation of concerns to keep the extension maintainable.
+`chrome.storage.sync` is the **source of truth**, not React state. React mirrors
+it through a `useChromeStorage`-style hook that subscribes to storage change
+events, so a change in one surface (popup, options, content script) shows up in
+the others without a reload.
 
-```text
-getir-filtre/
-├── manifest.json            # Manifest V3 configuration
-├── vite.config.ts           # CRXJS and Vite config
-├── tailwind.config.js       # Design system (Dark mode enabled)
-├── src/
-│   ├── assets/              # Static assets
-│   ├── background/          # Service Worker
-│   │   └── index.ts         # Listeners for installation/updates
-│   ├── content/             # Script running on GetirYemek
-│   │   ├── index.ts         # Entry point (MutationObserver setup)
-│   │   ├── dom-scanner.ts   # Logic to identify restaurant cards (Resilient selectors)
-│   │   ├── card-manipulator.ts # Logic to Hide/Blur/Inject buttons
-│   │   └── types.ts         # Content-script specific types
-│   ├── popup/               # The Extension UI (React App)
-│   │   ├── index.tsx        # Mount point
-│   │   ├── App.tsx          # Main UI Layout
-│   │   ├── components/      # Reusable UI components (Filters, Blacklist Manager)
-│   │   └── hooks/           # useSettings, useBlacklist
-│   ├── shared/              # Shared utilities
-│   │   ├── storage.ts       # Typed wrappers for chrome.storage
-│   │   ├── constants.ts     # defaultSettings, DOM selectors
-│   │   └── theme.ts         # Tailwind theme config
-```
+## Conventions
 
----
+- **No `any`** — use `unknown` or define the interface. The DOM is volatile, so
+  assume `querySelector` returns `null` and use `?.` aggressively.
+- Shared interfaces (`Restaurant`, `FilterSettings`) live in `src/shared/`, not
+  beside their consumers.
+- The popup supports **dark mode by default**.
 
-## 5. Coding Rules & Best Practices
+## Working style
 
-### A. TypeScript & Safety
-1.  **No `any`**: Use `unknown` or define an interface.
-2.  **Shared Types**: Define shared interfaces (e.g., `Restaurant`, `FilterSettings`) in `src/shared/types.ts`.
-3.  **Null Checks**: The DOM is volatile. Always assume `querySelector` can return `null`. Use optional chaining (`?.`) aggressively.
+Terse and direct. Lead with the code, skip the explanation of standard
+React/TypeScript unless asked.
 
-### B. DOM Manipulation (Content Script)
-1.  **Resilience**: GetirYemek uses obfuscated/dynamic class names (e.g., `.style__Card-sc...`).
-    *   *Rule:* Do **not** rely solely on specific class hashes.
-    *   *Strategy:* Use relative selectors or attribute matchers where possible (e.g., "Find the `div` containing an `img` and a price format text").
-2.  **Performance**:
-    *   Use a single `MutationObserver` at the root of the feed container.
-    *   Debounce DOM processing logic to avoid freezing the UI during scrolling.
-3.  **Injection**: When injecting the "X" (Block) button, create a React Portal or append a pure DOM element with a unique ID to avoid React hydration conflicts with the host site.
+## User communication
 
-### C. State Management
-1.  **Source of Truth**: `chrome.storage.sync` is the database.
-2.  **React Sync**: Use a custom hook (`useChromeStorage`) to sync React state with Chrome storage changes in real-time.
-
-### D. Styling (Tailwind)
-1.  **Prefixing**: Ensure Tailwind classes do not bleed into the host site. (Vite/CRXJS usually handles scoping, but be mindful).
-2.  **Dark Mode**: The UI (Popup) must support Dark Mode by default.
-3.  **Z-Index War**: Ensure injected elements have a high z-index but don't block critical Getir UI (like the cart).
-
----
-
-## 6. Implementation Roadmap (Step-by-Step)
-
-### Phase 1: Infrastructure
-1.  Initialize Vite + React + TS project.
-2.  Install `crxjs`, `tailwindcss`, `lucide-react`.
-3.  Setup `manifest.json` (V3) with permissions: `storage`, `activeTab`, `scripting`.
-
-### Phase 2: The Scanner (Content Script)
-1.  Create `dom-scanner.ts` to detect restaurant cards.
-2.  Implement `MutationObserver` to detect new cards on scroll.
-3.  Log detected restaurant names/IDs to console to verify accuracy.
-
-### Phase 3: The Purge (Blacklist Logic)
-1.  Implement `storage.ts` wrapper.
-2.  Inject the "X" button onto cards.
-3.  On click -> Add restaurant Name/ID to storage -> Remove card from DOM.
-
-### Phase 4: The UI (Popup)
-1.  Build the Popup UI with Tailwind.
-2.  Create "Blacklist Manager" (list of banned places with "Unban" button).
-3.  Create "Filter Controls" (Min Rating input, Max Delivery Time input).
-
-### Phase 5: Advanced Filtering
-1.  Update `dom-scanner.ts` to parse Rating, Time, and Price from the card text.
-2.  Apply logic: If `card.rating < user.minRating`, hide card.
-
----
-
-## 7. Error Handling Strategy
-*   **Content Script**: Wrap main logic in `try/catch`. If the DOM structure changes and parsing fails, log a discrete warning to the console but **do not** crash the Getir page.
-*   **Storage**: Handle `chrome.runtime.lastError` gracefully.
-
----
-
-**End of Instructions.**
-```
+Always use ASD-STE100 Simplified Technical English when talking to the user.

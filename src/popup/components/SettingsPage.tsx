@@ -1,4 +1,4 @@
-import { ArrowLeft, Shield, Star, ShoppingBag, MessageSquare, MapPin, Clock, Layout, Save } from 'lucide-react';
+import { ArrowLeft, Shield, Star, ShoppingBag, MessageSquare, MapPin, Clock, Layout, Save, Tag, BarChart3 } from 'lucide-react';
 import { UserSettings } from '../../shared/types';
 import FilterSettings from './FilterSettings';
 import BentoGrid from './Bento/BentoGrid';
@@ -11,13 +11,17 @@ import DeliveryFilterCard from './cards/DeliveryFilterCard';
 import TogglesCard from './cards/TogglesCard';
 import SectionVisibilityCard from './cards/SectionVisibilityCard';
 import BlockedRestaurantsCard from './cards/BlockedRestaurantsCard';
+import BlockedKeywordsCard from './cards/BlockedKeywordsCard';
 import BackupCard from './cards/BackupCard';
+import PrivacyCard from './cards/PrivacyCard';
 
 interface SettingsPageProps {
     settings: UserSettings;
     onBack?: () => void;
     unblockRestaurant: (slug: string) => void;
     clearBlocklist: () => void;
+    blockKeyword: (keyword: string) => void;
+    unblockKeyword: (keyword: string) => void;
     onImport: (settings: UserSettings) => Promise<void>;
     onExport: () => void;
     onReset: () => void;
@@ -30,12 +34,18 @@ export default function SettingsPage({
     onBack,
     unblockRestaurant,
     clearBlocklist,
+    blockKeyword,
+    unblockKeyword,
     onImport,
     onExport,
     onReset,
     updateSetting,
     isTabMode = false,
 }: SettingsPageProps) {
+    // Read from the manifest so the footer cannot drift from the release
+    const extensionVersion = () =>
+        (typeof chrome !== 'undefined' && chrome.runtime?.getManifest?.().version) || '1.1.1';
+
     // --- Full Page Bento Layout ---
     if (isTabMode) {
         return (
@@ -43,14 +53,14 @@ export default function SettingsPage({
                 <div className="max-w-[1400px] mx-auto space-y-8">
                     {/* Header */}
                     <header className="flex items-center gap-4 mb-8">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gf-accent-purple to-violet-700 flex items-center justify-center shadow-lg shadow-gf-accent-purple/20">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gf-accent-purple to-gf-accent-purple-dark flex items-center justify-center shadow-lg shadow-gf-accent-purple/20">
                             <Shield className="w-6 h-6 text-white" />
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                                GetirFiltre Ayarları
+                                Filtre Ayarları
                             </h1>
-                            <p className="text-gray-400">Tüm filtrelerinizi tek bir yerden yönetin.</p>
+                            <p className="text-gray-400">GetirYemek ve Uber Eats Trendyol Go filtrelerini tek bir yerden yönetin.</p>
                         </div>
                     </header>
 
@@ -93,6 +103,19 @@ export default function SettingsPage({
                             </BentoCard>
                         </div>
 
+                        <BentoCard
+                            title="Engellenen Kelimeler"
+                            description={`${(settings.blockedKeywords || []).length} kelime engellendi`}
+                            icon={<Tag className="w-5 h-5 text-pink-500" />}
+                            className="md:col-span-2 md:row-span-2"
+                        >
+                            <BlockedKeywordsCard
+                                settings={settings}
+                                blockKeyword={blockKeyword}
+                                unblockKeyword={unblockKeyword}
+                            />
+                        </BentoCard>
+
                         {/* Row 3: Admin / Section Visibility */}
                         <BentoCard title="Görünüm Ayarları" description="Sayfa bölümlerini gizle/göster" icon={<Layout className="w-5 h-5 text-purple-400" />} className="md:col-span-2">
                             <SectionVisibilityCard settings={settings} updateSetting={updateSetting} disabled={!settings.isEnabled} variant="default" />
@@ -101,10 +124,14 @@ export default function SettingsPage({
                         <BentoCard title="Sistem" description="Yedekleme ve sıfırlama" icon={<Save className="w-5 h-5 text-green-400" />} className="md:col-span-2">
                             <BackupCard onExport={onExport} onImport={onImport} onReset={onReset} />
                         </BentoCard>
+
+                        <BentoCard title="Gizlilik" description="Anonim kullanım istatistikleri" icon={<BarChart3 className="w-5 h-5 text-teal-400" />} className="md:col-span-2">
+                            <PrivacyCard />
+                        </BentoCard>
                     </BentoGrid>
 
                     <footer className="text-center text-gray-500 text-sm mt-12">
-                        Değişiklikler anında kaydedilir ✨ • v1.0.0
+                        Değişiklikler anında kaydedilir ✨ • v{extensionVersion()}
                     </footer>
                 </div>
             </div>
@@ -132,6 +159,10 @@ export default function SettingsPage({
                     disabled={!settings.isEnabled}
                     variant="compact"
                 />
+
+                <div className="p-4 bg-gf-dark-800 rounded-xl border border-gf-dark-700">
+                    <PrivacyCard />
+                </div>
 
                 <div className="p-4 bg-gf-dark-800 rounded-xl border border-gf-dark-700 text-center space-y-3">
                     <Shield className="w-8 h-8 text-gf-accent-purple mx-auto opacity-50" />

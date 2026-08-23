@@ -5,18 +5,29 @@ import { STORAGE_KEYS } from './constants';
  * Storage wrapper with sync primary, local fallback
  */
 class StorageService {
-    private useLocalFallback = false;
-
     /**
      * Get settings from storage
      */
     async getSettings(): Promise<UserSettings> {
         try {
-            const result = await this.get(STORAGE_KEYS.SETTINGS);
-            if (result) {
-                return { ...DEFAULT_SETTINGS, ...result };
-            }
-            return { ...DEFAULT_SETTINGS };
+            const [syncResult, localResult] = await Promise.all([
+                this.getSync<any>(STORAGE_KEYS.SETTINGS),
+                this.getLocal<any>(STORAGE_KEYS.SETTINGS),
+            ]);
+
+            const merged: UserSettings = {
+                ...DEFAULT_SETTINGS,
+                ...(syncResult || {}),
+                ...(localResult || {}),
+            };
+
+            // Older installs have no name map, and blocklists must stay iterable
+            return {
+                ...merged,
+                blockedRestaurants: merged.blockedRestaurants ?? [],
+                blockedKeywords: merged.blockedKeywords ?? [],
+                blockedNames: merged.blockedNames ?? {},
+            };
         } catch (error) {
             console.error('[GetirFiltre] Storage read error:', error);
             return { ...DEFAULT_SETTINGS };
@@ -28,7 +39,13 @@ class StorageService {
      */
     async saveSettings(settings: UserSettings): Promise<boolean> {
         try {
-            await this.set(STORAGE_KEYS.SETTINGS, settings);
+            const { blockedRestaurants, blockedKeywords, blockedNames, ...syncSettings } = settings;
+            const localSettings = { blockedRestaurants, blockedKeywords, blockedNames };
+
+            await Promise.all([
+                this.setSync(STORAGE_KEYS.SETTINGS, syncSettings),
+                this.setLocal(STORAGE_KEYS.SETTINGS, localSettings),
+            ]);
             return true;
         } catch (error) {
             console.error('[GetirFiltre] Storage write error:', error);
@@ -37,92 +54,129 @@ class StorageService {
     }
 
     /**
-     * Add a restaurant to blocklist
+     * Add a restaurant to blocklist.
+     * `key` is platform scoped ("tgo:1833"); Getir keys stay bare slugs.
+     * `name` is kept for display, since some platforms use numeric ids.
      */
-    async blockRestaurant(slug: string): Promise<boolean> {
+    async blockRestaurant(key: string, name?: string): Promise<boolean> {
         const settings = await this.getSettings();
-        if (!settings.blockedRestaurants.includes(slug)) {
-            settings.blockedRestaurants.push(slug);
+        let changed = false;
+
+        if (!settings.blockedRestaurants.includes(key)) {
+            settings.blockedRestaurants.push(key);
+            changed = true;
+        }
+
+        if (name && settings.blockedNames[key] !== name) {
+            settings.blockedNames = { ...settings.blockedNames, [key]: name };
+            changed = true;
+        }
+
+        return changed ? this.saveSettings(settings) : true;
+    }
+
+    /**
+     * Remove a restaurant from blocklist
+     */
+    async unblockRestaurant(key: string): Promise<boolean> {
+        const settings = await this.getSettings();
+        settings.blockedRestaurants = settings.blockedRestaurants.filter(s => s !== key);
+
+        const { [key]: _removed, ...remainingNames } = settings.blockedNames;
+        settings.blockedNames = remainingNames;
+
+        return this.saveSettings(settings);
+    }
+
+    /**
+     * Add a keyword to blocklist
+     */
+    async blockKeyword(keyword: string): Promise<boolean> {
+        const settings = await this.getSettings();
+        const normalized = keyword.trim().toLowerCase();
+        if (normalized && !settings.blockedKeywords.includes(normalized)) {
+            settings.blockedKeywords.push(normalized);
             return this.saveSettings(settings);
         }
         return true;
     }
 
     /**
-     * Remove a restaurant from blocklist
+     * Remove a keyword from blocklist
      */
-    async unblockRestaurant(slug: string): Promise<boolean> {
+    async unblockKeyword(keyword: string): Promise<boolean> {
         const settings = await this.getSettings();
-        settings.blockedRestaurants = settings.blockedRestaurants.filter(s => s !== slug);
+        const normalized = keyword.trim().toLowerCase();
+        settings.blockedKeywords = settings.blockedKeywords.filter(k => k !== normalized);
         return this.saveSettings(settings);
     }
 
     /**
-     * Clear all blocked restaurants
+     * Clear all blocked restaurants and keywords
      */
     async clearBlocklist(): Promise<boolean> {
         const settings = await this.getSettings();
         settings.blockedRestaurants = [];
+        settings.blockedNames = {};
+        settings.blockedKeywords = [];
         return this.saveSettings(settings);
     }
 
     /**
-     * Generic get from storage (sync first, local fallback)
+     * Get from sync storage
      */
-    private async get<T>(key: string): Promise<T | null> {
+    private async getSync<T>(key: string): Promise<T | null> {
         return new Promise((resolve) => {
-            const storage = this.useLocalFallback ? chrome.storage.local : chrome.storage.sync;
-
-            storage.get(key, (result) => {
+            chrome.storage.sync.get(key, (result) => {
                 if (chrome.runtime.lastError) {
-                    console.warn('[GetirFiltre] Sync storage error, trying local:', chrome.runtime.lastError);
-
-                    if (!this.useLocalFallback) {
-                        this.useLocalFallback = true;
-                        chrome.storage.local.get(key, (localResult) => {
-                            resolve(localResult[key] ?? null);
-                        });
-                        return;
-                    }
+                    console.warn('[GetirFiltre] Sync storage read error:', chrome.runtime.lastError);
+                    resolve(null);
+                } else {
+                    resolve(result[key] ?? null);
                 }
-                resolve(result[key] ?? null);
             });
         });
     }
 
     /**
-     * Generic set to storage (sync first, local fallback)
+     * Get from local storage
      */
-    private async set<T>(key: string, value: T): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const storage = this.useLocalFallback ? chrome.storage.local : chrome.storage.sync;
-
-            storage.set({ [key]: value }, () => {
+    private async getLocal<T>(key: string): Promise<T | null> {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(key, (result) => {
                 if (chrome.runtime.lastError) {
-                    const errorMsg = chrome.runtime.lastError.message || 'Unknown error';
+                    console.warn('[GetirFiltre] Local storage read error:', chrome.runtime.lastError);
+                    resolve(null);
+                } else {
+                    resolve(result[key] ?? null);
+                }
+            });
+        });
+    }
 
-                    // Check for quota exceeded
-                    if (errorMsg.includes('QUOTA_BYTES')) {
-                        console.error('[GetirFiltre] Storage quota exceeded!');
-                        reject(new Error('Storage quota exceeded'));
-                        return;
-                    }
+    /**
+     * Set to sync storage
+     */
+    private async setSync<T>(key: string, value: T): Promise<void> {
+        return new Promise((resolve, reject) => {
+            chrome.storage.sync.set({ [key]: value }, () => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
 
-                    // Try local fallback
-                    if (!this.useLocalFallback) {
-                        console.warn('[GetirFiltre] Sync failed, using local storage');
-                        this.useLocalFallback = true;
-                        chrome.storage.local.set({ [key]: value }, () => {
-                            if (chrome.runtime.lastError) {
-                                reject(new Error(chrome.runtime.lastError.message));
-                            } else {
-                                resolve();
-                            }
-                        });
-                        return;
-                    }
-
-                    reject(new Error(errorMsg));
+    /**
+     * Set to local storage
+     */
+    private async setLocal<T>(key: string, value: T): Promise<void> {
+        return new Promise((resolve, reject) => {
+            chrome.storage.local.set({ [key]: value }, () => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
                 } else {
                     resolve();
                 }
@@ -134,11 +188,16 @@ class StorageService {
      * Listen for storage changes (for popup/content sync)
      */
     onSettingsChange(callback: (settings: UserSettings) => void): void {
+        // Absent outside the extension context (e.g. vite dev preview)
+        if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) {
+            console.warn('[GetirFiltre] Storage events unavailable');
+            return;
+        }
+
         chrome.storage.onChanged.addListener((changes, areaName) => {
             if (areaName === 'sync' || areaName === 'local') {
                 if (changes[STORAGE_KEYS.SETTINGS]) {
-                    const newSettings = changes[STORAGE_KEYS.SETTINGS].newValue;
-                    callback({ ...DEFAULT_SETTINGS, ...newSettings });
+                    this.getSettings().then(callback);
                 }
             }
         });
