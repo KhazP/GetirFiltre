@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+title: GetirFiltre
+message: "If you use this project, please cite it as below."
+type: software
+authors:
+  - family-names: P
+    given-names: Khaz
+repository-code: "https://github.com/KhazP/GetirFiltre"
+url: "https://github.com/KhazP/GetirFiltre"
+license: Apache-2.0
+version: 1.0.0
+date-released: 2026-04-20

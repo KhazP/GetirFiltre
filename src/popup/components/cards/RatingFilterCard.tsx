@@ -1,9 +1,9 @@
-import { UserSettings } from '../../../shared/types';
+import { UserSettings, UpdateSetting } from '../../../shared/types';
 
 
 interface CardProps {
     settings: UserSettings;
-    updateSetting: (key: keyof UserSettings, value: any) => Promise<void>;
+    updateSetting: UpdateSetting;
     disabled?: boolean;
     variant?: 'default' | 'compact';
 }

@@ -31,6 +31,7 @@ export function useSettings() {
         await storage.saveSettings(newSettings);
     };
 
+
     // Toggle enabled
     const toggleEnabled = () => updateSetting('isEnabled', !settings.isEnabled);
 

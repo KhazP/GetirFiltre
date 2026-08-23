@@ -1,4 +1,4 @@
-import { UserSettings } from '../../shared/types';
+import { UserSettings, UpdateSetting } from '../../shared/types';
 import RatingFilterCard from './cards/RatingFilterCard';
 import BasketFilterCard from './cards/BasketFilterCard';
 import ReviewFilterCard from './cards/ReviewFilterCard';
@@ -9,7 +9,7 @@ import SectionVisibilityCard from './cards/SectionVisibilityCard';
 
 interface FilterSettingsProps {
     settings: UserSettings;
-    updateSetting: (key: keyof UserSettings, value: any) => Promise<void>;
+    updateSetting: UpdateSetting;
     disabled?: boolean;
     variant?: 'default' | 'compact';
 }
