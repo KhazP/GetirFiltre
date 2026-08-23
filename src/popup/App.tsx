@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react';
-import { Settings, Trash2, X, ChevronDown, ChevronUp, Star, ShoppingBag, MessageSquare, MapPin, Clock, Shield, Check, EyeOff, LucideIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, ChevronDown, ChevronUp, Clock, EyeOff, LucideIcon, MapPin, MessageSquare, Settings, Shield, ShoppingBag, Star, Tag, Trash2, X } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
+import { useActivePlatform } from './hooks/useActivePlatform';
 import SettingsPage from './components/SettingsPage';
+import BlockedKeywordsCard from './components/cards/BlockedKeywordsCard';
 import { UserSettings, DEFAULT_SETTINGS } from '../shared/types';
 
 type Page = 'main' | 'settings';
@@ -20,6 +22,20 @@ interface CompactInputProps {
 }
 
 function CompactInput({ icon: Icon, value, onChange, label, suffix, color, disabled, tooltip }: CompactInputProps) {
+    const [localValue, setLocalValue] = useState<string>(() => value !== null ? value.toString() : '');
+
+    // Keep local value synced with external props
+    useEffect(() => {
+        setLocalValue(value !== null ? value.toString() : '');
+    }, [value]);
+
+    const handleCommit = () => {
+        const parsed = localValue !== '' ? parseFloat(localValue) : null;
+        if (parsed !== value) {
+            onChange(parsed);
+        }
+    };
+
     return (
         <div className={`bg-gf-dark-800 rounded-lg p-2.5 ${disabled ? 'opacity-50' : ''}`} title={tooltip}>
             <div className="flex items-center gap-2 mb-1.5">
@@ -29,9 +45,15 @@ function CompactInput({ icon: Icon, value, onChange, label, suffix, color, disab
             <div className="flex items-center gap-1.5">
                 <input
                     type="number"
-                    value={value ?? ''}
-                    onChange={(e) => onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                    className="w-full bg-gf-dark-700 border border-gf-dark-600 rounded px-2 py-1 text-sm font-mono text-white
+                    value={localValue}
+                    onChange={(e) => setLocalValue(e.target.value)}
+                    onBlur={handleCommit}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            handleCommit();
+                        }
+                    }}
+                    className="w-full min-w-0 bg-gf-dark-700 border border-gf-dark-600 rounded px-2 py-1 text-sm font-mono text-white
                         focus:outline-none focus:border-gf-accent-purple transition-all"
                     disabled={disabled}
                 />
@@ -57,7 +79,7 @@ function ChipToggle({ label, active, onClick, disabled, tooltip, isHider = false
             disabled={disabled}
             title={tooltip}
             className={`
-                px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 flex items-center justify-center gap-1
+                px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 flex items-center justify-center gap-1 min-w-0
                 ${isHider
                     ? (active
                         ? 'bg-red-500/20 text-red-400 border border-red-500/30'
@@ -69,9 +91,9 @@ function ChipToggle({ label, active, onClick, disabled, tooltip, isHider = false
                 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
             `}
         >
-            {isHider && active && <EyeOff className="w-3 h-3" />}
-            {!isHider && active && <Check className="w-3 h-3" />}
-            {label}
+            {isHider && active && <EyeOff className="w-3 h-3 flex-shrink-0" />}
+            {!isHider && active && <Check className="w-3 h-3 flex-shrink-0" />}
+            <span className="truncate">{label}</span>
         </button>
     );
 }
@@ -86,8 +108,33 @@ export default function App() {
         updateSetting,
         clearBlocklist,
         unblockRestaurant,
+        blockKeyword,
+        unblockKeyword,
         replaceSettings,
     } = useSettings();
+
+    const { platform, isOnSite, has } = useActivePlatform();
+
+    const [localMaxDeliveryTime, setLocalMaxDeliveryTime] = useState<string>(() =>
+        settings?.maxDeliveryTime !== null && settings?.maxDeliveryTime !== undefined 
+            ? settings.maxDeliveryTime.toString() 
+            : ''
+    );
+
+    useEffect(() => {
+        setLocalMaxDeliveryTime(
+            settings?.maxDeliveryTime !== null && settings?.maxDeliveryTime !== undefined 
+                ? settings.maxDeliveryTime.toString() 
+                : ''
+        );
+    }, [settings?.maxDeliveryTime]);
+
+    const handleCommitMaxDeliveryTime = () => {
+        const parsed = localMaxDeliveryTime !== '' ? parseInt(localMaxDeliveryTime, 10) : null;
+        if (parsed !== settings.maxDeliveryTime) {
+            updateSetting('maxDeliveryTime', parsed);
+        }
+    };
 
     const isTabMode = useMemo(() => new URLSearchParams(window.location.search).has('page'), []);
     const [currentPage, setCurrentPage] = useState<Page>(() => {
@@ -95,6 +142,7 @@ export default function App() {
         return params.get('page') === 'settings' ? 'settings' : 'main';
     });
     const [showBlocklist, setShowBlocklist] = useState(false);
+    const [showKeywords, setShowKeywords] = useState(false);
 
     const handleExport = () => {
         const exportData = { version: 1, exportedAt: new Date().toISOString(), settings };
@@ -115,6 +163,25 @@ export default function App() {
     const handleImport = async (importedSettings: UserSettings) => await replaceSettings(importedSettings);
     const handleReset = async () => await replaceSettings(DEFAULT_SETTINGS);
 
+    // Controls are declared once and filtered by what the active site supports
+    const numericFilters = ([
+        { key: 'minRating', icon: Star, label: 'Min Puan', suffix: '/5', color: 'text-yellow-500', tooltip: 'Bu puanın altındaki restoranlar gizlenir' },
+        { key: 'maxMinBasket', icon: ShoppingBag, label: 'Max Sepet', suffix: '₺', color: 'text-gf-accent-purple', tooltip: 'Bu tutarın üzerinde minimum sepet limiti olan restoranlar gizlenir' },
+        { key: 'minReviewCount', icon: MessageSquare, label: 'Min Yorum', suffix: '', color: 'text-blue-400', tooltip: 'Bu sayının altında yorumu olan restoranlar gizlenir' },
+        { key: 'maxDistance', icon: MapPin, label: 'Max Mesafe', suffix: 'km', color: 'text-red-400', tooltip: 'Bu mesafeden uzak restoranlar gizlenir' },
+    ] as const).filter((filter) => has(filter.key));
+
+    const cardToggles = ([
+        { key: 'showOnlyPromotions', label: 'Kampanya', tooltip: 'Sadece kampanyalı restoranları göster', isHider: false },
+        { key: 'hideSponsored', label: 'Sponsor', tooltip: 'Sponsorlu restoranları gizle', isHider: true },
+    ] as const).filter((chip) => has(chip.key));
+
+    const sectionToggles = ([
+        { key: 'hideCampaignCarousel', label: 'Karusel', tooltip: 'Üst kampanya karuselini gizle' },
+        { key: 'hideMudavimSection', label: 'Müdavim', tooltip: 'GetirYemek Müdavim bölümünü gizle' },
+        { key: 'hideAciktiysanSection', label: 'Açıktıysan', tooltip: 'ACIKTIYSAN bölümünü gizle' },
+    ] as const).filter((chip) => has(chip.key));
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-[300px] bg-gf-dark-900">
@@ -126,12 +193,14 @@ export default function App() {
     // Settings Page
     if (currentPage === 'settings') {
         return (
-            <div className={isTabMode ? "min-h-screen bg-gf-dark-950 text-white" : "w-[340px] min-h-[400px] bg-gf-dark-900 text-white flex flex-col"}>
+            <div className={isTabMode ? "min-h-screen bg-gf-dark-950 text-white" : "w-full min-h-[400px] bg-gf-dark-900 text-white flex flex-col"}>
                 <SettingsPage
                     settings={settings}
                     onBack={() => setCurrentPage('main')}
                     unblockRestaurant={unblockRestaurant}
                     clearBlocklist={clearBlocklist}
+                    blockKeyword={blockKeyword}
+                    unblockKeyword={unblockKeyword}
                     onImport={handleImport}
                     onExport={handleExport}
                     onReset={handleReset}
@@ -147,11 +216,11 @@ export default function App() {
             {/* Compact Header */}
             <header className="bg-gf-dark-800 px-3 py-2.5 border-b border-gf-dark-600">
                 <div className="flex items-center justify-between">
-                    <button onClick={toggleEnabled} className="flex items-center gap-2 group" title={settings.isEnabled ? 'Filtreleri kapat' : 'Filtreleri aç'}>
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${settings.isEnabled ? 'bg-gradient-to-br from-gf-accent-purple to-violet-700 shadow-lg shadow-gf-accent-purple/30' : 'bg-gf-dark-600'}`}>
+                    <button onClick={toggleEnabled} className="flex items-center gap-2 group" title={isOnSite ? `${platform.site} için filtreler` : (settings.isEnabled ? 'Filtreleri kapat' : 'Filtreleri aç')}>
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${settings.isEnabled ? 'bg-gradient-to-br from-gf-accent-purple to-gf-accent-purple-dark shadow-lg shadow-gf-accent-purple/30' : 'bg-gf-dark-600'}`}>
                             <Shield className="w-4 h-4 text-white" />
                         </div>
-                        <span className={`font-bold text-sm ${settings.isEnabled ? 'text-white' : 'text-gray-500'}`}>GetirFiltre</span>
+                        <span className={`font-bold text-sm ${settings.isEnabled ? 'text-white' : 'text-gray-500'}`}>{platform.brand}</span>
                     </button>
                     <div className="flex items-center gap-2">
                         <button
@@ -170,7 +239,7 @@ export default function App() {
                         <button
                             onClick={toggleEnabled}
                             title={settings.isEnabled ? 'Filtreleri kapat' : 'Filtreleri aç'}
-                            className={`relative w-10 h-5 rounded-full transition-all ${settings.isEnabled ? 'bg-gf-accent-purple shadow-[0_0_8px_rgba(168,85,247,0.4)]' : 'bg-gf-dark-600'}`}
+                            className={`relative w-10 h-5 rounded-full transition-all ${settings.isEnabled ? 'bg-gf-accent-purple shadow-[0_0_8px_rgb(var(--gf-brand)/0.4)]' : 'bg-gf-dark-600'}`}
                         >
                             <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${settings.isEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
                         </button>
@@ -180,51 +249,27 @@ export default function App() {
 
             {/* Main Grid */}
             <main className="p-3 space-y-3">
-                {/* 2x2 Filter Grid */}
-                <div className="grid grid-cols-2 gap-2">
-                    <CompactInput
-                        icon={Star}
-                        value={settings.minRating}
-                        onChange={(v) => updateSetting('minRating', v)}
-                        label="Min Puan"
-                        suffix="/5"
-                        color="text-yellow-500"
-                        disabled={!settings.isEnabled}
-                        tooltip="Bu puanın altındaki restoranlar gizlenir"
-                    />
-                    <CompactInput
-                        icon={ShoppingBag}
-                        value={settings.maxMinBasket}
-                        onChange={(v) => updateSetting('maxMinBasket', v)}
-                        label="Max Sepet"
-                        suffix="₺"
-                        color="text-gf-accent-purple"
-                        disabled={!settings.isEnabled}
-                        tooltip="Bu tutarın üzerinde minimum sepet limiti olan restoranlar gizlenir"
-                    />
-                    <CompactInput
-                        icon={MessageSquare}
-                        value={settings.minReviewCount}
-                        onChange={(v) => updateSetting('minReviewCount', v)}
-                        label="Min Yorum"
-                        suffix=""
-                        color="text-blue-400"
-                        disabled={!settings.isEnabled}
-                        tooltip="Bu sayının altında yorumu olan restoranlar gizlenir"
-                    />
-                    <CompactInput
-                        icon={MapPin}
-                        value={settings.maxDistance}
-                        onChange={(v) => updateSetting('maxDistance', v)}
-                        label="Max Mesafe"
-                        suffix="km"
-                        color="text-red-400"
-                        disabled={!settings.isEnabled}
-                        tooltip="Bu mesafeden uzak restoranlar gizlenir"
-                    />
-                </div>
+                {/* Filter Grid - only the filters this site supports */}
+                {numericFilters.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2">
+                        {numericFilters.map((filter) => (
+                            <CompactInput
+                                key={filter.key}
+                                icon={filter.icon}
+                                value={settings[filter.key] as number | null}
+                                onChange={(v) => updateSetting(filter.key, v)}
+                                label={filter.label}
+                                suffix={filter.suffix}
+                                color={filter.color}
+                                disabled={!settings.isEnabled}
+                                tooltip={filter.tooltip}
+                            />
+                        ))}
+                    </div>
+                )}
 
                 {/* Delivery Time - Full Width */}
+                {has('maxDeliveryTime') && (
                 <div className="bg-gf-dark-800 rounded-lg p-2.5" title="Bu süreden uzun teslimat süreleri olan restoranlar gizlenir">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -234,8 +279,14 @@ export default function App() {
                         <div className="flex items-center gap-1.5">
                             <input
                                 type="number"
-                                value={settings.maxDeliveryTime ?? ''}
-                                onChange={(e) => updateSetting('maxDeliveryTime', e.target.value ? parseInt(e.target.value) : null)}
+                                value={localMaxDeliveryTime}
+                                onChange={(e) => setLocalMaxDeliveryTime(e.target.value)}
+                                onBlur={handleCommitMaxDeliveryTime}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleCommitMaxDeliveryTime();
+                                    }
+                                }}
                                 className="w-16 bg-gf-dark-700 border border-gf-dark-600 rounded px-2 py-1 text-sm font-mono text-white text-right
                                     focus:outline-none focus:border-gf-accent-purple transition-all disabled:opacity-50"
                                 disabled={!settings.isEnabled}
@@ -244,53 +295,41 @@ export default function App() {
                         </div>
                     </div>
                 </div>
+                )}
 
                 {/* Toggle Chips Row - Feature toggles */}
-                <div className="flex gap-1.5">
-                    <ChipToggle
-                        label="Kampanya"
-                        active={settings.showOnlyPromotions}
-                        onClick={() => updateSetting('showOnlyPromotions', !settings.showOnlyPromotions)}
-                        disabled={!settings.isEnabled}
-                        tooltip="Sadece kampanyalı restoranları göster"
-                    />
-                    <ChipToggle
-                        label="Sponsor"
-                        active={settings.hideSponsored}
-                        onClick={() => updateSetting('hideSponsored', !settings.hideSponsored)}
-                        disabled={!settings.isEnabled}
-                        tooltip="Sponsorlu restoranları gizle"
-                        isHider={true}
-                    />
-                </div>
+                {cardToggles.length > 0 && (
+                    <div className="flex gap-1.5">
+                        {cardToggles.map((chip) => (
+                            <ChipToggle
+                                key={chip.key}
+                                label={chip.label}
+                                active={settings[chip.key] as boolean}
+                                onClick={() => updateSetting(chip.key, !settings[chip.key])}
+                                disabled={!settings.isEnabled}
+                                tooltip={chip.tooltip}
+                                isHider={chip.isHider}
+                            />
+                        ))}
+                    </div>
+                )}
 
                 {/* Section Visibility Chips - These hide sections */}
-                <div className="flex gap-1.5">
-                    <ChipToggle
-                        label="Karusel"
-                        active={settings.hideCampaignCarousel}
-                        onClick={() => updateSetting('hideCampaignCarousel', !settings.hideCampaignCarousel)}
-                        disabled={!settings.isEnabled}
-                        tooltip="Üst kampanya karuselini gizle"
-                        isHider={true}
-                    />
-                    <ChipToggle
-                        label="Müdavim"
-                        active={settings.hideMudavimSection}
-                        onClick={() => updateSetting('hideMudavimSection', !settings.hideMudavimSection)}
-                        disabled={!settings.isEnabled}
-                        tooltip="GetirYemek Müdavim bölümünü gizle"
-                        isHider={true}
-                    />
-                    <ChipToggle
-                        label="Açıktıysan"
-                        active={settings.hideAciktiysanSection}
-                        onClick={() => updateSetting('hideAciktiysanSection', !settings.hideAciktiysanSection)}
-                        disabled={!settings.isEnabled}
-                        tooltip="ACIKTIYSAN bölümünü gizle"
-                        isHider={true}
-                    />
-                </div>
+                {sectionToggles.length > 0 && (
+                    <div className="flex gap-1.5">
+                        {sectionToggles.map((chip) => (
+                            <ChipToggle
+                                key={chip.key}
+                                label={chip.label}
+                                active={settings[chip.key] as boolean}
+                                onClick={() => updateSetting(chip.key, !settings[chip.key])}
+                                disabled={!settings.isEnabled}
+                                tooltip={chip.tooltip}
+                                isHider={true}
+                            />
+                        ))}
+                    </div>
+                )}
 
                 {/* Blocked Restaurants - Collapsible */}
                 <div className="bg-gf-dark-800 rounded-lg overflow-hidden">
@@ -317,10 +356,10 @@ export default function App() {
                             ) : (
                                 <>
                                     <div className="max-h-[120px] overflow-y-auto">
-                                        {settings.blockedRestaurants.map((slug) => (
-                                            <div key={slug} className="flex items-center justify-between px-3 py-1.5 hover:bg-gf-dark-700">
-                                                <span className="text-xs text-gray-300 truncate flex-1 mr-2">{formatSlug(slug)}</span>
-                                                <button onClick={() => unblockRestaurant(slug)} className="text-gray-500 hover:text-gf-accent-red p-0.5" title="Engeli kaldır">
+                                        {settings.blockedRestaurants.map((key) => (
+                                            <div key={key} className="flex items-center justify-between px-3 py-1.5 hover:bg-gf-dark-700">
+                                                <span className="text-xs text-gray-300 truncate flex-1 mr-2">{settings.blockedNames?.[key] || formatSlug(key)}</span>
+                                                <button onClick={() => unblockRestaurant(key)} className="text-gray-500 hover:text-gf-accent-red p-0.5" title="Engeli kaldır">
                                                     <X className="w-3 h-3" />
                                                 </button>
                                             </div>
@@ -341,10 +380,45 @@ export default function App() {
                         </div>
                     )}
                 </div>
+
+                {/* Blocked Keywords - Collapsible */}
+                <div className="bg-gf-dark-800 rounded-lg overflow-hidden">
+                    <button
+                        onClick={() => setShowKeywords(!showKeywords)}
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-gf-dark-700 transition-colors"
+                        title="Engellediğiniz kelimelerin listesi"
+                    >
+                        <div className="flex items-center gap-2">
+                            <Tag className="w-3.5 h-3.5 text-gf-accent-purple" />
+                            <span className="text-xs font-medium">Engellenen Kelimeler</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="bg-gf-dark-600 px-1.5 py-0.5 rounded text-xs font-mono">
+                                {(settings.blockedKeywords || []).length}
+                            </span>
+                            {showKeywords ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
+                        </div>
+                    </button>
+                    {showKeywords && (
+                        <div className="border-t border-gf-dark-600 p-3">
+                            <BlockedKeywordsCard
+                                settings={settings}
+                                blockKeyword={blockKeyword}
+                                unblockKeyword={unblockKeyword}
+                                variant="compact"
+                            />
+                        </div>
+                    )}
+                </div>
             </main>
 
             {/* Footer */}
             <footer className="border-t border-gf-dark-600 px-3 py-2 text-center mt-auto">
+                {isOnSite && (
+                    <p className="text-[10px] text-gray-400 mb-0.5">
+                        <span className="text-gf-accent-purple">●</span> {platform.site} filtreleri
+                    </p>
+                )}
                 <p className="text-[10px] text-gray-500">💡 Detaylı bilgi kutuların üzerine fare'yi tutun</p>
             </footer>
         </>
@@ -363,12 +437,13 @@ export default function App() {
 
     // Popup layout - centered
     return (
-        <div className="w-[340px] bg-gf-dark-900 text-white flex flex-col mx-auto">
+        <div className="w-full bg-gf-dark-900 text-white flex flex-col mx-auto">
             {content}
         </div>
     );
 }
 
-function formatSlug(slug: string): string {
-    return slug.split('-').slice(0, 3).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+function formatSlug(key: string): string {
+    // Fallback for entries saved before names were stored
+    return key.replace(/^[a-z]+:/, '').split('-').slice(0, 3).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }

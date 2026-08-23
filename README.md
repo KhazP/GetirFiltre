@@ -50,11 +50,53 @@ npm run build  # Üretim derlemesi
 npm run test   # Birim testleri
 ```
 
+## Proje Yapısı
+
+```
+src/
+├── content/          # GetirYemek içine enjekte edilen içerik betiği
+│   ├── index.tsx     # Ana giriş noktası & MutationObserver
+│   ├── dom-scanner.ts    # Restoran kartlarını bulur ve ayrıştırır
+│   ├── card-manipulator.ts # Kartları gizler, butonları enjekte eder
+│   └── styles.css    # İçerik stili
+├── popup/            # Uzantı popup arayüzü (React + Tailwind)
+│   ├── App.tsx       # Ana popup bileşeni
+│   ├── components/   # Alt bileşenler (Ayarlar Sayfası vb.)
+│   └── hooks/        # Ayarlar için React hook'ları
+├── shared/           # İçerik ve popup arasındaki ortak kodlar
+│   ├── storage.ts    # Chrome storage sarmalayıcısı
+│   ├── telemetry.ts  # Anonim kullanım sayaçları (kapatılabilir)
+│   ├── types.ts      # TypeScript arayüzleri
+│   └── constants.ts  # DOM seçicileri, desenler
+└── background/       # Servis çalışanı (minimal)
+```
+
 ## Yazılım Gereksinimleri
 
 - Runtime ve bağımlılıklar: `package.json`
 - Kilitli sürümler: `package-lock.json`
 - TypeScript yapılandırması: `tsconfig.json`
+
+## 🔒 Gizlilik
+
+Restoran adları, engellenen kelimeler, filtre değerleri, adresler, fiyatlar ve
+gezdiğiniz sayfalar **asla** cihazınızdan çıkmaz. Ayarlar `chrome.storage` içinde
+kalır.
+
+**Anonim kullanım istatistikleri** varsayılan olarak açıktır. En fazla 30 dakikada
+bir (ve tarayıcı açılışında) şunlar gönderilir:
+
+| Alan | Değer |
+|------|-------|
+| Uygulama adı | Sabit `getirfiltre` metni |
+| Anahtar | Sabit, herkese açık, yalnızca spam filtresi |
+| Kurulum kimliği | Kurulumda bir kez üretilen rastgele UUID; sizden veya cihazınızdan türetilmez |
+| Sürüm | Eklenti sürümü |
+| Olay sayıları | `ext_installed`, `ext_updated`, `ext_active`, `ext_filter_applied`, `ext_block_added` |
+
+Bu beş ad sabittir; başka hiçbir ad gönderilemez. **Kapatmak için**: eklenti
+panelinde **Ayarlar → Gizlilik**. Kapattığınızda kurulum kimliği ve bekleyen tüm
+sayaçlar anında silinir. Yeniden açtığınızda yeni bir rastgele kimlik üretilir.
 
 ## Dependency ve Katkı Teşekkürü
 

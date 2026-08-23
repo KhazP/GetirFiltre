@@ -1,4 +1,9 @@
 /**
+ * Supported delivery platforms
+ */
+export type PlatformId = 'getir' | 'tgo';
+
+/**
  * User settings stored in chrome.storage
  */
 export interface UserSettings {
@@ -14,7 +19,9 @@ export interface UserSettings {
     hideCampaignCarousel: boolean; // hide top campaign carousel
     hideMudavimSection: boolean; // hide "GetirYemek Müdavim" section
     hideAciktiysanSection: boolean; // hide "ACIKTIYSAN" promotion section
-    blockedRestaurants: string[]; // Array of slugs
+    blockedRestaurants: string[]; // Array of storage keys (see RestaurantCard.key)
+    blockedNames: Record<string, string>; // storage key -> display name
+    blockedKeywords: string[]; // Array of lowercase keywords to block
 }
 
 /**
@@ -29,8 +36,11 @@ export type UpdateSetting = <K extends keyof UserSettings>(
  * Restaurant data extracted from DOM
  */
 export interface RestaurantCard {
-    element: HTMLElement;
-    slug: string;
+    element: HTMLElement; // card root: marked as processed, hosts the block button
+    hideTarget: HTMLElement; // element to hide (wrapper, may equal element)
+    platform: PlatformId;
+    slug: string; // platform-local id ("kfc-atasehir" or "1833")
+    key: string; // storage key: bare slug on Getir (legacy), "tgo:1833" elsewhere
     name: string;
     rating: number | null; // null if no rating (new restaurant)
     reviewCount: number | null; // null if no reviews yet
@@ -58,13 +68,15 @@ export const DEFAULT_SETTINGS: UserSettings = {
     hideMudavimSection: false,
     hideAciktiysanSection: false,
     blockedRestaurants: [],
+    blockedNames: {},
+    blockedKeywords: [],
 };
 
 /**
  * Undo action for recent hides
  */
 export interface UndoAction {
-    slug: string;
+    key: string;
     name: string;
     timestamp: number;
 }

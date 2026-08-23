@@ -2,15 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Base styles - Dark Mode */
+/* ===== Brand accent per site =====
+ * The popup rebrands to the site it filters: GetirFiltre (purple) on
+ * GetirYemek, UberFiltre (green) on Uber Eats Trendyol Go.
+ * Values are RGB channels, so Tailwind opacity modifiers keep working.
+ */
+:root {
+    --gf-brand: 168 85 247;
+    --gf-brand-dark: 109 40 217;
+}
+
+[data-platform='tgo'] {
+    --gf-brand: 6 193 103;
+    --gf-brand-dark: 4 143 76;
+}
+
+/* ===== Chrome Extension Popup Sizing =====
+ * Chrome sizes the popup window to body.scrollWidth.
+ * If ANY child overflows, Chrome makes the window wider.
+ * Fix: clamp #root with max-width + overflow:hidden so
+ * overflowing children never increase body.scrollWidth.
+ */
 html,
 body {
-    font-family: 'Inter', system-ui, sans-serif;
+    width: 320px;
+    max-width: 320px;
     margin: 0;
     padding: 0;
+    font-family: 'Inter', system-ui, sans-serif;
     background-color: #0a0a0a;
-    /* gf-dark-950 */
     color: #ffffff;
+}
+
+#root {
+    width: 320px;
+    max-width: 320px;
+    min-height: 400px;
+    overflow: hidden;
 }
 
 /* Custom scrollbar */

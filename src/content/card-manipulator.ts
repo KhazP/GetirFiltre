@@ -1,6 +1,8 @@
 import { RestaurantCard, UndoAction, UserSettings } from '../shared/types';
 import { CSS_CLASSES, TIMING } from '../shared/constants';
 import { storage } from '../shared/storage';
+import { PlatformAdapter } from './platforms';
+import { sendTelemetryEvent } from '../shared/telemetry-events';
 
 // Undo buffer for recent hides
 const undoBuffer: UndoAction[] = [];
@@ -8,17 +10,14 @@ const undoBuffer: UndoAction[] = [];
 /**
  * Inject a block button onto a restaurant card
  */
-export function injectBlockButton(card: RestaurantCard): void {
-    // Check if button already exists
+export function injectBlockButton(card: RestaurantCard, adapter: PlatformAdapter): void {
     if (card.element.querySelector(`.${CSS_CLASSES.BLOCK_BUTTON_CONTAINER}`)) {
         return;
     }
 
-    // Create button container
     const container = document.createElement('div');
     container.className = CSS_CLASSES.BLOCK_BUTTON_CONTAINER;
 
-    // Create button
     const button = document.createElement('button');
     button.className = CSS_CLASSES.BLOCK_BUTTON;
     button.innerHTML = '×';
@@ -37,98 +36,60 @@ export function injectBlockButton(card: RestaurantCard): void {
         e.stopImmediatePropagation();
     }, { capture: true, passive: false });
 
-    // Handle click
     button.addEventListener('click', async (e) => {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
 
-        // Add to undo buffer
         addToUndoBuffer({
-            slug: card.slug,
+            key: card.key,
             name: card.name,
             timestamp: Date.now(),
         });
 
-        // Block in storage
-        await storage.blockRestaurant(card.slug);
+        await storage.blockRestaurant(card.key, card.name);
+        sendTelemetryEvent('ext_block_added');
 
-        // Hide immediately
-        hideCard(card.element);
+        hideCard(card.hideTarget);
 
-        // Also hide any related menu items in search results
-        hideRelatedItems(card.slug);
+        // Search results also list the restaurant's menu items
+        adapter.hideRelated?.(card.slug, hideCard);
 
-        console.log(`[GetirFiltre] Blocked: ${card.name} (${card.slug})`);
+        console.log(`[GetirFiltre] Blocked: ${card.name} (${card.key})`);
     });
 
     container.appendChild(button);
 
-    // Position container
     card.element.style.position = 'relative';
     card.element.appendChild(container);
 }
 
 /**
- * Hide all related items (menu items) in search results that belong to the same restaurant
- * Menu items appear as sibling elements after the restaurant card in search results
- */
-function hideRelatedItems(slug: string): void {
-    // Find the restaurant card link with this slug
-    const restaurantLink = document.querySelector<HTMLAnchorElement>(
-        `a[href*="/yemek/restoran/${slug}/"]`
-    );
-
-    if (!restaurantLink) return;
-
-    // Find the outermost container (the anchor wrapper or its parent)
-    let container: HTMLElement | null = restaurantLink;
-
-    // Walk up to find the main search result container
-    while (container && container.parentElement) {
-        // Check if we're at a level where siblings are other search results
-        const parent: HTMLElement = container.parentElement;
-        const siblings = parent.children;
-
-        // If parent has multiple children that look like search result items, we're at the right level
-        let foundLevel = false;
-        for (const sibling of siblings) {
-            if (sibling !== container && (
-                sibling.querySelector('article[type="list-view-with-image"]') ||
-                sibling.classList.contains('sc-f5b1a14a-2') // Menu item class
-            )) {
-                foundLevel = true;
-                break;
-            }
-        }
-
-        if (foundLevel) {
-            // Now hide all following siblings that are menu items (not restaurant cards)
-            let nextSibling = container.nextElementSibling as HTMLElement | null;
-
-            while (nextSibling) {
-                // Check if this is another restaurant card - stop if so
-                if (nextSibling.querySelector('article[type="list-view-with-image"]') ||
-                    nextSibling.querySelector('a[href*="/yemek/restoran/"]')) {
-                    break;
-                }
-
-                // This looks like a menu item - hide it
-                hideCard(nextSibling);
-                nextSibling = nextSibling.nextElementSibling as HTMLElement | null;
-            }
-            break;
-        }
-
-        container = parent;
-    }
-}
-
-/**
- * Hide a card (using CSS class for easy reversal)
+ * Hide a card (using visual fade transition, then CSS class)
  */
 export function hideCard(element: HTMLElement): void {
-    element.classList.add(CSS_CLASSES.HIDDEN);
+    if (element.classList.contains(CSS_CLASSES.HIDDEN)) return;
+
+    element.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+    element.style.opacity = '1';
+    element.style.transform = 'scale(1)';
+
+    // Force reflow
+    void element.offsetHeight;
+
+    element.style.opacity = '0';
+    element.style.transform = 'scale(0.95)';
+
+    const onTransitionEnd = (e: TransitionEvent) => {
+        if (e.propertyName === 'opacity') {
+            element.classList.add(CSS_CLASSES.HIDDEN);
+            element.style.removeProperty('transition');
+            element.style.removeProperty('opacity');
+            element.style.removeProperty('transform');
+            element.removeEventListener('transitionend', onTransitionEnd);
+        }
+    };
+    element.addEventListener('transitionend', onTransitionEnd);
 }
 
 /**
@@ -136,6 +97,9 @@ export function hideCard(element: HTMLElement): void {
  */
 export function showCard(element: HTMLElement): void {
     element.classList.remove(CSS_CLASSES.HIDDEN);
+    element.style.removeProperty('transition');
+    element.style.removeProperty('opacity');
+    element.style.removeProperty('transform');
 }
 
 /**
@@ -146,84 +110,80 @@ export function markProcessed(element: HTMLElement): void {
 }
 
 /**
- * Process all cards: hide blocked, inject buttons, apply filters
+ * The single filter decision. Every surface (first pass, re-evaluation after a
+ * settings change) goes through this, so the rules cannot drift apart.
  */
-export function processCards(cards: RestaurantCard[], settings: UserSettings): number {
+export function shouldHideCard(card: RestaurantCard, settings: UserSettings): boolean {
+    if (settings.blockedRestaurants.includes(card.key)) {
+        return true;
+    }
+
+    if (settings.blockedKeywords?.length) {
+        const haystack = `${card.name} ${card.promotions.join(' ')}`.toLowerCase();
+        if (settings.blockedKeywords.some((keyword) => haystack.includes(keyword))) {
+            return true;
+        }
+    }
+
+    if (settings.minRating !== null && card.rating !== null && card.rating < settings.minRating) {
+        return true;
+    }
+
+    if (settings.maxMinBasket !== null && card.minBasket !== null && card.minBasket > settings.maxMinBasket) {
+        return true;
+    }
+
+    if (settings.minReviewCount !== null && card.reviewCount !== null && card.reviewCount < settings.minReviewCount) {
+        return true;
+    }
+
+    if (settings.maxDistance !== null && card.distance !== null && card.distance > settings.maxDistance) {
+        return true;
+    }
+
+    if (
+        settings.maxDeliveryTime !== null &&
+        card.deliveryTimeMinutes !== null &&
+        card.deliveryTimeMinutes > settings.maxDeliveryTime
+    ) {
+        return true;
+    }
+
+    if (settings.showOnlyPromotions && card.promotions.length === 0) {
+        return true;
+    }
+
+    if (settings.hideSponsored && card.isSponsored) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Process cards: hide the ones that fail the filters, add a block button to the rest.
+ * Returns how many cards were hidden.
+ */
+export function processCards(
+    cards: RestaurantCard[],
+    settings: UserSettings,
+    adapter: PlatformAdapter
+): number {
     let hiddenCount = 0;
 
     cards.forEach((card) => {
-        // Mark as processed first
         markProcessed(card.element);
 
-        // Check if blocked
-        if (settings.blockedRestaurants.includes(card.slug)) {
-            hideCard(card.element);
+        if (shouldHideCard(card, settings)) {
+            hideCard(card.hideTarget);
             hiddenCount++;
             return;
         }
 
-        // Apply rating filter (only if card has rating and filter is set)
-        if (settings.minRating !== null && card.rating !== null) {
-            if (card.rating < settings.minRating) {
-                hideCard(card.element);
-                hiddenCount++;
-                return;
-            }
-        }
+        showCard(card.hideTarget);
 
-        // Apply min basket filter
-        if (settings.maxMinBasket !== null && card.minBasket !== null) {
-            if (card.minBasket > settings.maxMinBasket) {
-                hideCard(card.element);
-                hiddenCount++;
-                return;
-            }
-        }
-
-        // Apply review count filter
-        if (settings.minReviewCount !== null && card.reviewCount !== null) {
-            if (card.reviewCount < settings.minReviewCount) {
-                hideCard(card.element);
-                hiddenCount++;
-                return;
-            }
-        }
-
-        // Apply distance filter
-        if (settings.maxDistance !== null && card.distance !== null) {
-            if (card.distance > settings.maxDistance) {
-                hideCard(card.element);
-                hiddenCount++;
-                return;
-            }
-        }
-
-        // Apply max delivery time filter
-        if (settings.maxDeliveryTime !== null && card.deliveryTimeMinutes !== null) {
-            if (card.deliveryTimeMinutes > settings.maxDeliveryTime) {
-                hideCard(card.element);
-                hiddenCount++;
-                return;
-            }
-        }
-
-        // Apply show only promotions filter
-        if (settings.showOnlyPromotions && card.promotions.length === 0) {
-            hideCard(card.element);
-            hiddenCount++;
-            return;
-        }
-
-        // Apply hide sponsored filter
-        if (settings.hideSponsored && card.isSponsored) {
-            hideCard(card.element);
-            hiddenCount++;
-            return;
-        }
-
-        // Card passed filters - inject block button
         if (settings.isEnabled) {
-            injectBlockButton(card);
+            injectBlockButton(card, adapter);
         }
     });
 
@@ -253,7 +213,7 @@ export function getLastBlocked(): UndoAction | null {
 export async function undoLastBlock(): Promise<UndoAction | null> {
     const action = undoBuffer.shift();
     if (action) {
-        await storage.unblockRestaurant(action.slug);
+        await storage.unblockRestaurant(action.key);
         return action;
     }
     return null;

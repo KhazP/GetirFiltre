@@ -1,7 +1,16 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { processCards } from './card-manipulator';
 import { CSS_CLASSES } from '../shared/constants';
+
+/**
+ * Hiding is animated: the HIDDEN class is added on `transitionend`, which never
+ * fires in jsdom. What is observable synchronously is the fade being started,
+ * so that is what these assert — plus the PROCESSED marker and the returned
+ * count, both of which are set immediately.
+ */
+const isHiding = (card: RestaurantCard) => card.hideTarget.style.opacity === '0';
 import { DEFAULT_SETTINGS, RestaurantCard, UserSettings } from '../shared/types';
+import { getirAdapter } from './platforms/getir';
 
 function createCard(partial: Partial<RestaurantCard>): RestaurantCard {
   const element = document.createElement('article');
@@ -10,6 +19,10 @@ function createCard(partial: Partial<RestaurantCard>): RestaurantCard {
 
   return {
     element,
+    // Getir hides the card root itself; other platforms hide a wrapper.
+    hideTarget: element,
+    platform: 'getir',
+    key: partial.slug ?? 'demo-slug',
     slug: 'demo-slug',
     name: 'Demo Restaurant',
     rating: 4.5,
@@ -42,11 +55,12 @@ describe('processCards', () => {
 
     const hiddenCount = processCards(
       [card],
-      settings({ blockedRestaurants: ['blocked-restaurant'] })
+      settings({ blockedRestaurants: ['blocked-restaurant'] }),
+      getirAdapter
     );
 
     expect(hiddenCount).toBe(1);
-    expect(card.element.classList.contains(CSS_CLASSES.HIDDEN)).toBe(true);
+    expect(isHiding(card)).toBe(true);
     expect(card.element.classList.contains(CSS_CLASSES.PROCESSED)).toBe(true);
   });
 
@@ -57,13 +71,14 @@ describe('processCards', () => {
 
     const hiddenCount = processCards(
       [lowRatingCard, farDistanceCard, okCard],
-      settings({ minRating: 4.0, maxDistance: 5 })
+      settings({ minRating: 4.0, maxDistance: 5 }),
+      getirAdapter
     );
 
     expect(hiddenCount).toBe(2);
-    expect(lowRatingCard.element.classList.contains(CSS_CLASSES.HIDDEN)).toBe(true);
-    expect(farDistanceCard.element.classList.contains(CSS_CLASSES.HIDDEN)).toBe(true);
-    expect(okCard.element.classList.contains(CSS_CLASSES.HIDDEN)).toBe(false);
+    expect(isHiding(lowRatingCard)).toBe(true);
+    expect(isHiding(farDistanceCard)).toBe(true);
+    expect(isHiding(okCard)).toBe(false);
   });
 
   it('hides non-promotional cards when promotions-only is enabled', () => {
@@ -72,11 +87,12 @@ describe('processCards', () => {
 
     const hiddenCount = processCards(
       [plainCard, promoCard],
-      settings({ showOnlyPromotions: true })
+      settings({ showOnlyPromotions: true }),
+      getirAdapter
     );
 
     expect(hiddenCount).toBe(1);
-    expect(plainCard.element.classList.contains(CSS_CLASSES.HIDDEN)).toBe(true);
-    expect(promoCard.element.classList.contains(CSS_CLASSES.HIDDEN)).toBe(false);
+    expect(isHiding(plainCard)).toBe(true);
+    expect(isHiding(promoCard)).toBe(false);
   });
 });

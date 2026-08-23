@@ -13,9 +13,14 @@ export default function BlockedRestaurantsCard({ settings, unblockRestaurant, cl
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOrder, setSortOrder] = useState<'recent' | 'az' | 'za'>('recent');
 
-    // Define formatSlug BEFORE useMemo uses it (arrow functions are not hoisted)
-    const formatSlug = (slug: string) => {
-        return slug
+    // Define displayName BEFORE useMemo uses it (arrow functions are not hoisted)
+    const displayName = (key: string) => {
+        // Saved name wins: Trendyol Go keys are numeric ids ("tgo:1833")
+        const stored = settings.blockedNames?.[key];
+        if (stored) return stored;
+
+        return key
+            .replace(/^[a-z]+:/, '')
             .split('-')
             .slice(0, 3)
             .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -23,17 +28,17 @@ export default function BlockedRestaurantsCard({ settings, unblockRestaurant, cl
     };
 
     const filteredRestaurants = useMemo(() => {
-        let results = settings.blockedRestaurants.filter((slug) =>
-            formatSlug(slug).toLowerCase().includes(searchQuery.toLowerCase())
+        let results = settings.blockedRestaurants.filter((key) =>
+            displayName(key).toLowerCase().includes(searchQuery.toLowerCase())
         );
 
         if (sortOrder === 'az') {
-            results = [...results].sort((a, b) => formatSlug(a).localeCompare(formatSlug(b), 'tr'));
+            results = [...results].sort((a, b) => displayName(a).localeCompare(displayName(b), 'tr'));
         } else if (sortOrder === 'za') {
-            results = [...results].sort((a, b) => formatSlug(b).localeCompare(formatSlug(a), 'tr'));
+            results = [...results].sort((a, b) => displayName(b).localeCompare(displayName(a), 'tr'));
         }
         return results;
-    }, [settings.blockedRestaurants, searchQuery, sortOrder]);
+    }, [settings.blockedRestaurants, settings.blockedNames, searchQuery, sortOrder]);
 
     return (
         <div className={`flex flex-col h-full gap-4 ${className || ''}`}>
@@ -78,16 +83,16 @@ export default function BlockedRestaurantsCard({ settings, unblockRestaurant, cl
                     </div>
                 ) : (
                     <div className="absolute inset-0 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                        {filteredRestaurants.map((slug) => (
+                        {filteredRestaurants.map((key) => (
                             <div
-                                key={slug}
+                                key={key}
                                 className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gf-dark-700/80 group transition-colors"
                             >
                                 <span className="text-sm text-gray-300 truncate flex-1 mr-2 font-medium">
-                                    {formatSlug(slug)}
+                                    {displayName(key)}
                                 </span>
                                 <button
-                                    onClick={() => unblockRestaurant(slug)}
+                                    onClick={() => unblockRestaurant(key)}
                                     className="text-gray-500 hover:text-gf-accent-red p-1 rounded-md hover:bg-gf-accent-red/10 transition-all opacity-0 group-hover:opacity-100"
                                 >
                                     <X className="w-4 h-4" />

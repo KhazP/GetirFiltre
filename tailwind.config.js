@@ -16,7 +16,10 @@ export default {
                     500: '#2d2d2d',
                 },
                 'gf-accent': {
-                    purple: '#a855f7',
+                    // Brand accent. The value follows the active site:
+                    // Getir purple, Uber Eats green (see [data-platform] in index.css).
+                    purple: 'rgb(var(--gf-brand) / <alpha-value>)',
+                    'purple-dark': 'rgb(var(--gf-brand-dark) / <alpha-value>)',
                     blue: '#06b6d4',
                     red: '#ef4444',
                 },
