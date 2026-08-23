@@ -1,11 +1,13 @@
 import { scanRestaurantCards } from './dom-scanner';
-import { processCards, showCard, hideCard } from './card-manipulator';
+import { processCards, showCard } from './card-manipulator';
 import { storage } from '../shared/storage';
 import { UserSettings } from '../shared/types';
-import { TIMING, URL_PATTERNS, CSS_CLASSES } from '../shared/constants';
+import { TIMING, CSS_CLASSES } from '../shared/constants';
+import { detectPlatform, PlatformAdapter, storageKey } from './platforms';
+import { sendTelemetryEvent } from '../shared/telemetry-events';
 
-// Inject CSS directly into page
-const cssStyles = `
+// Base styles, shared by every platform. Site-specific rules come from the adapter.
+const baseStyles = `
 /* GetirFiltre Content Script Styles */
 .getirfiltre-hidden {
   display: none !important;
@@ -21,12 +23,6 @@ const cssStyles = `
   pointer-events: auto;
 }
 
-article:hover .getirfiltre-btn-container,
-[class*="restaurant"]:hover .getirfiltre-btn-container,
-[class*="Restaurant"]:hover .getirfiltre-btn-container {
-  opacity: 1;
-}
-
 .getirfiltre-block-btn {
   pointer-events: auto;
   cursor: pointer;
@@ -39,7 +35,6 @@ article:hover .getirfiltre-btn-container,
   font-size: 16px;
   font-weight: bold;
   line-height: 1;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -89,35 +84,26 @@ article:hover .getirfiltre-btn-container,
 }
 `;
 
-function injectStyles(): void {
+function injectStyles(adapter: PlatformAdapter): void {
     if (document.getElementById('getirfiltre-styles')) return;
+
     const style = document.createElement('style');
     style.id = 'getirfiltre-styles';
-    style.textContent = cssStyles;
+    style.textContent = baseStyles + adapter.css;
     document.head.appendChild(style);
 }
 
-// Current settings cache
+const platform = detectPlatform();
+
 let currentSettings: UserSettings | null = null;
 let isInitialized = false;
-let totalHiddenCount = 0; // Track total hidden restaurants for badge
-
-/**
- * Listen for direct messages from popup for instant updates
- */
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message.type === 'SETTINGS_UPDATED' && message.settings) {
-        console.log('[GetirFiltre] Received settings update from popup');
-        currentSettings = message.settings;
-
-        // Apply changes immediately
-        manageSectionVisibility(message.settings);
-        reEvaluateAllCards(message.settings);
-
-        sendResponse({ success: true });
-    }
-    return true; // Keep channel open for async response
-});
+let listeningForSettings = false;
+let totalHiddenCount = 0;
+let activeListingsObserver: MutationObserver | null = null;
+let activeDetailObserver: MutationObserver | null = null;
+// Reported at most once per page load: the observer re-runs the filter on every
+// infinite-scroll batch, and one count per page is the useful signal.
+let filterEventSent = false;
 
 /**
  * Send badge update to background script
@@ -128,10 +114,24 @@ function sendBadgeUpdate(): void {
             type: 'UPDATE_BADGE',
             hiddenCount: totalHiddenCount,
             isEnabled: currentSettings?.isEnabled ?? true,
+            platform: platform?.id ?? null,
         });
     } catch (error) {
         // Ignore errors (e.g., extension context invalidated)
     }
+}
+
+/**
+ * The popup asks which site this tab is on, so it can show the right brand
+ * and only the filters this site supports.
+ */
+function listenForPlatformRequests(): void {
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+        if (message?.type === 'GET_PLATFORM') {
+            sendResponse({ platform: platform?.id ?? null });
+        }
+        return false;
+    });
 }
 
 /**
@@ -148,336 +148,146 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T 
     }) as T;
 }
 
-/**
- * Manage visibility of page sections (carousels, promo sections)
- */
-function manageSectionVisibility(settings: UserSettings): void {
-    // Hide/show top campaign carousel (first carousel that's not inside a card)
-    const topCarousels = document.querySelectorAll('div[data-testid="carousel"]');
-    const topCarousel = topCarousels[0] as HTMLElement | undefined;
-    if (topCarousel && !topCarousel.closest('div[data-testid="card"]')) {
-        topCarousel.style.display = settings.hideCampaignCarousel ? 'none' : '';
-    }
-
-    // Find Müdavim and ACIKTIYSAN sections by their card containers
-    // These are div[data-testid="card"] elements containing H5 headers with specific text
-    const allCards = document.querySelectorAll<HTMLElement>('div[data-testid="card"]');
-
-    allCards.forEach((card) => {
-        const h5 = card.querySelector('h5[data-testid="title"]');
-        if (!h5) return;
-
-        const text = h5.textContent || '';
-
-        // Müdavim section
-        if (text.includes('Müdavim')) {
-            card.style.display = settings.hideMudavimSection ? 'none' : '';
-        }
-        // ACIKTIYSAN section  
-        else if (text.includes('ACIKTIYSAN')) {
-            card.style.display = settings.hideAciktiysanSection ? 'none' : '';
-        }
-    });
+function showAllHiddenCards(): number {
+    const hidden = document.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.HIDDEN}`);
+    hidden.forEach((element) => showCard(element));
+    return hidden.length;
 }
 
 /**
- * Main processing function
+ * Main processing function.
+ * `includeProcessed` re-checks cards that were already handled - used after a
+ * settings change so filters apply instantly, without a page reload.
  */
-function runFilter(): void {
-    if (!currentSettings) {
+function runFilter(includeProcessed = false): void {
+    if (!platform || !currentSettings) {
         return;
     }
 
-    // Always manage section visibility (even when filters are disabled)
-    manageSectionVisibility(currentSettings);
+    try {
+        // Section visibility applies even when the filters are off
+        platform.applySectionVisibility(currentSettings);
+    } catch (error) {
+        console.warn('[GetirFiltre] Section visibility failed:', error);
+    }
 
     if (!currentSettings.isEnabled) {
+        const shown = showAllHiddenCards();
+        if (shown > 0) {
+            console.log(`[GetirFiltre] Disabled - showed ${shown} cards`);
+        }
         totalHiddenCount = 0;
         sendBadgeUpdate();
         return;
     }
 
-    const cards = scanRestaurantCards();
+    const cards = scanRestaurantCards(platform, includeProcessed);
 
     if (cards.length > 0) {
-        const hiddenCount = processCards(cards, currentSettings);
-        totalHiddenCount = document.querySelectorAll('.getirfiltre-hidden').length;
-
-        if (hiddenCount > 0) {
-            console.log(`[GetirFiltre] Processed ${cards.length} cards, hid ${hiddenCount}, total hidden: ${totalHiddenCount}`);
+        const hiddenCount = processCards(cards, currentSettings, platform);
+        console.log(
+            `[GetirFiltre] Processed ${cards.length} cards on ${platform.label}, hid ${hiddenCount}`
+        );
+        if (hiddenCount > 0 && !filterEventSent) {
+            filterEventSent = true;
+            sendTelemetryEvent('ext_filter_applied');
         }
     }
 
-    sendBadgeUpdate();
-}
-
-// Debounced version
-const debouncedRunFilter = debounce(runFilter, TIMING.DEBOUNCE_MS);
-
-/**
- * Re-evaluate all processed cards when settings change
- * This allows instant show/hide when any filter value changes
- */
-function reEvaluateAllCards(newSettings: UserSettings): void {
-    // If extension is disabled, show all hidden cards
-    if (!newSettings.isEnabled) {
-        const hiddenCards = document.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.HIDDEN}`);
-        hiddenCards.forEach((el) => showCard(el));
-        console.log(`[GetirFiltre] Disabled - showed ${hiddenCards.length} cards`);
-        totalHiddenCount = 0;
-        sendBadgeUpdate();
-        return;
-    }
-
-    // Find all processed cards (including hidden ones)
-    const processedCards = document.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.PROCESSED}`);
-    let showCount = 0;
-    let hideCount = 0;
-
-    processedCards.forEach((element) => {
-        // Extract data from the card to check filters
-        const link = element.querySelector<HTMLAnchorElement>('a[href*="/yemek/restoran/"]');
-        if (!link) return;
-
-        const href = link.getAttribute('href');
-        if (!href) return;
-
-        const slugMatch = href.match(/\/yemek\/restoran\/([^/]+)\//);
-        if (!slugMatch) return;
-
-        const slug = slugMatch[1];
-
-        // Check if this card should be hidden
-        let shouldHide = false;
-
-        // Check blocklist
-        if (newSettings.blockedRestaurants.includes(slug)) {
-            shouldHide = true;
-        }
-
-        // Check other filters by re-extracting data
-        if (!shouldHide) {
-            // Re-extract card data for filter checks
-            const cardText = element.innerText || '';
-
-            // Rating check
-            if (newSettings.minRating !== null) {
-                const ratingMatch = cardText.match(/(\d\.\d)\s*\(\d/);
-                if (ratingMatch) {
-                    const rating = parseFloat(ratingMatch[1]);
-                    if (rating < newSettings.minRating) {
-                        shouldHide = true;
-                    }
-                }
-            }
-
-            // Min basket check
-            if (!shouldHide && newSettings.maxMinBasket !== null) {
-                const minBasketMatch = cardText.match(/Min\.\s*₺?(\d+)/i);
-                if (minBasketMatch) {
-                    const minBasket = parseInt(minBasketMatch[1], 10);
-                    if (minBasket > newSettings.maxMinBasket) {
-                        shouldHide = true;
-                    }
-                }
-            }
-
-            // Distance check
-            if (!shouldHide && newSettings.maxDistance !== null) {
-                const distanceMatch = cardText.match(/(?:^|[\s\n])(\d+[,.]?\d*)\s*km/i);
-                if (distanceMatch) {
-                    const distance = parseFloat(distanceMatch[1].replace(',', '.'));
-                    if (distance > newSettings.maxDistance) {
-                        shouldHide = true;
-                    }
-                }
-            }
-
-            // Delivery time check
-            if (!shouldHide && newSettings.maxDeliveryTime !== null) {
-                const timeMatch = cardText.match(/(\d+)-?(\d+)?\s*dk/);
-                if (timeMatch) {
-                    // Use max time from range (e.g., "25-35 dk" -> 35)
-                    const deliveryTime = timeMatch[2] ? parseInt(timeMatch[2], 10) : parseInt(timeMatch[1], 10);
-                    if (deliveryTime > newSettings.maxDeliveryTime) {
-                        shouldHide = true;
-                    }
-                }
-            }
-
-            // Review count check  
-            if (!shouldHide && newSettings.minReviewCount !== null) {
-                const reviewMatch = cardText.match(/\((\d+)\+?\)/);
-                if (reviewMatch) {
-                    const reviewCount = parseInt(reviewMatch[1], 10);
-                    if (reviewCount < newSettings.minReviewCount) {
-                        shouldHide = true;
-                    }
-                }
-            }
-
-            // Sponsored check
-            if (!shouldHide && newSettings.hideSponsored) {
-                if (cardText.includes('Sponsorlu')) {
-                    shouldHide = true;
-                }
-            }
-
-            // Promotions only check
-            if (!shouldHide && newSettings.showOnlyPromotions) {
-                if (!cardText.toLowerCase().includes('indirim') && !cardText.includes('ACIKTIYSAN')) {
-                    shouldHide = true;
-                }
-            }
-        }
-
-        // Apply visibility change
-        const isCurrentlyHidden = element.classList.contains(CSS_CLASSES.HIDDEN);
-
-        if (shouldHide && !isCurrentlyHidden) {
-            hideCard(element);
-            hideCount++;
-        } else if (!shouldHide && isCurrentlyHidden) {
-            showCard(element);
-            showCount++;
-        }
-    });
-
-    if (showCount > 0 || hideCount > 0) {
-        console.log(`[GetirFiltre] Re-evaluated: showed ${showCount}, hid ${hideCount} cards`);
-    }
-
-    // Update badge with current hidden count
     totalHiddenCount = document.querySelectorAll(`.${CSS_CLASSES.HIDDEN}`).length;
     sendBadgeUpdate();
 }
 
-/**
- * Set up MutationObserver
- */
-function setupObserver(): void {
-    const observer = new MutationObserver((mutations) => {
-        // Check if any mutations added nodes that might be restaurant cards
-        let hasNewNodes = false;
+const debouncedRunFilter = debounce(() => runFilter(), TIMING.DEBOUNCE_MS);
 
+function setupObserver(): void {
+    if (!platform) return;
+
+    if (activeListingsObserver) {
+        activeListingsObserver.disconnect();
+    }
+
+    activeListingsObserver = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
-            if (mutation.addedNodes.length > 0) {
-                for (const node of mutation.addedNodes) {
-                    if (node instanceof HTMLElement) {
-                        // Check if it's a potential card or container of cards
-                        if (node.tagName === 'ARTICLE' || node.querySelector?.('article')) {
-                            hasNewNodes = true;
-                            break;
-                        }
-                    }
+            for (const node of mutation.addedNodes) {
+                if (node instanceof HTMLElement && platform.isCardMutation(node)) {
+                    debouncedRunFilter();
+                    return;
                 }
             }
-            if (hasNewNodes) break;
-        }
-
-        if (hasNewNodes) {
-            debouncedRunFilter();
         }
     });
 
-    // Observe the body for new restaurant cards (infinite scroll)
-    observer.observe(document.body, {
+    // Infinite scroll / "show more" adds cards long after load
+    activeListingsObserver.observe(document.body, {
         childList: true,
         subtree: true,
     });
 
-    console.log('[GetirFiltre] MutationObserver active');
+    console.log('[GetirFiltre] Listings MutationObserver active');
 }
 
 /**
  * Inject a block button on the restaurant detail page
  */
-async function injectRestaurantPageBlockButton(): Promise<void> {
-    // Check if already injected
+function injectRestaurantPageBlockButton(): void {
+    if (!platform) return;
     if (document.querySelector(`.${CSS_CLASSES.RESTAURANT_PAGE_BLOCK_BUTTON}`)) {
         return;
     }
 
-    // Extract slug from URL
-    const slugMatch = window.location.href.match(URL_PATTERNS.RESTAURANT_DETAIL);
-    if (!slugMatch) return;
+    const slug = platform.detailSlug(window.location.href);
+    if (!slug) return;
 
-    const slug = slugMatch[1];
-
-    // Find the restaurant name header - look for the main heading
-    // Getir uses various selectors, try multiple approaches
-    let headerContainer: HTMLElement | null = null;
-
-    // Try to find the restaurant name element (usually a heading or prominent text)
-    const possibleHeaders = document.querySelectorAll('h1, h2, [class*="RestaurantName"], [class*="restaurantName"]');
-    for (const header of possibleHeaders) {
-        if (header.textContent && header.textContent.length > 2 && header.textContent.length < 100) {
-            headerContainer = header as HTMLElement;
-            break;
-        }
-    }
-
-    // Fallback: look for the area near the restaurant image
-    if (!headerContainer) {
-        const infoSection = document.querySelector('[class*="InfoSection"], [class*="RestaurantInfo"], article');
-        if (infoSection) {
-            const firstP = infoSection.querySelector('p, h1, h2, span');
-            if (firstP && firstP.textContent && firstP.textContent.length > 2) {
-                headerContainer = firstP as HTMLElement;
-            }
-        }
-    }
-
-    if (!headerContainer) {
-        console.log('[GetirFiltre] Could not find restaurant header on detail page');
-        return;
-    }
-
-    // Create button
     const button = document.createElement('button');
     button.className = CSS_CLASSES.RESTAURANT_PAGE_BLOCK_BUTTON;
     button.innerHTML = '×';
     button.title = 'Restoran Gizle (Block Restaurant)';
     button.setAttribute('aria-label', 'Block this restaurant');
 
-    // Handle click
     button.addEventListener('click', async (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        await storage.blockRestaurant(slug);
+        const name = platform.detailName() || slug;
+        await storage.blockRestaurant(storageKey(platform.id, slug), name);
+        sendTelemetryEvent('ext_block_added');
 
-        // Visual feedback
         button.innerHTML = '✓';
         button.style.background = 'rgba(34, 197, 94, 0.9)';
         button.title = 'Blocked!';
 
-        console.log(`[GetirFiltre] Blocked restaurant from detail page: ${slug}`);
+        console.log(`[GetirFiltre] Blocked restaurant from detail page: ${name}`);
 
-        // Optional: redirect back after a short delay
         setTimeout(() => {
             window.history.back();
         }, 500);
     });
 
-    // Insert button after the header
-    headerContainer.style.display = 'inline-flex';
-    headerContainer.style.alignItems = 'center';
-    headerContainer.appendChild(button);
+    let mounted = false;
+    try {
+        mounted = platform.mountDetailButton(button);
+    } catch (error) {
+        console.warn('[GetirFiltre] Could not mount detail button:', error);
+    }
 
-    console.log(`[GetirFiltre] Injected block button on restaurant page: ${slug}`);
+    if (mounted) {
+        console.log(`[GetirFiltre] Injected block button on restaurant page: ${slug}`);
+    }
 }
 
 /**
  * Initialize the content script
  */
 async function init(): Promise<void> {
-    const url = window.location.href;
-    const isRestaurantsPage = URL_PATTERNS.RESTAURANTS_PAGE.test(url);
-    const isRestaurantDetailPage = URL_PATTERNS.RESTAURANT_DETAIL.test(url);
+    if (!platform) {
+        return;
+    }
 
-    // Check if we're on a supported page
-    if (!isRestaurantsPage && !isRestaurantDetailPage) {
+    const url = window.location.href;
+    const isDetailPage = platform.detailSlug(url) !== null;
+
+    if (!isDetailPage && !platform.hasListings(url)) {
         console.log('[GetirFiltre] Not on a supported page, skipping');
         return;
     }
@@ -486,73 +296,77 @@ async function init(): Promise<void> {
         return;
     }
 
-    console.log('[GetirFiltre] Initializing on GetirYemek...');
+    console.log(`[GetirFiltre] Initializing on ${platform.label}...`);
 
-    // Inject styles first
-    injectStyles();
+    injectStyles(platform);
 
-    // Load settings
     currentSettings = await storage.getSettings();
-    console.log('[GetirFiltre] Settings loaded:', currentSettings);
 
-    // Handle restaurant detail page
-    if (isRestaurantDetailPage) {
-        // Wait a bit for the page to fully render
-        setTimeout(() => {
-            injectRestaurantPageBlockButton();
-        }, 500);
+    if (isDetailPage) {
+        if (activeListingsObserver) {
+            activeListingsObserver.disconnect();
+            activeListingsObserver = null;
+        }
 
-        // Also observe for dynamic content loading
-        const detailObserver = new MutationObserver(() => {
+        // The header renders after the first paint
+        setTimeout(injectRestaurantPageBlockButton, 500);
+
+        activeDetailObserver?.disconnect();
+        activeDetailObserver = new MutationObserver(() => {
             injectRestaurantPageBlockButton();
         });
-        detailObserver.observe(document.body, { childList: true, subtree: true });
+        activeDetailObserver.observe(document.body, { childList: true, subtree: true });
 
         isInitialized = true;
         console.log('[GetirFiltre] Restaurant detail page ready! 🚀');
         return;
     }
 
-    // Listen for settings changes (for listings page)
-    storage.onSettingsChange((newSettings) => {
-        console.log('[GetirFiltre] Settings updated:', newSettings);
-        currentSettings = newSettings;
+    if (activeDetailObserver) {
+        activeDetailObserver.disconnect();
+        activeDetailObserver = null;
+    }
 
-        // Handle section visibility immediately (Campaign/Müdavim/ACIKTIYSAN toggles)
-        manageSectionVisibility(newSettings);
+    // Storage is the source of truth: react to changes from popup or options
+    if (!listeningForSettings) {
+        listeningForSettings = true;
+        storage.onSettingsChange((newSettings) => {
+            currentSettings = newSettings;
+            runFilter(true);
+        });
+    }
 
-        // Re-evaluate all cards for instant show/hide
-        reEvaluateAllCards(newSettings);
-    });
-
-    // Initial run
     runFilter();
-
-    // Set up observer for infinite scroll
     setupObserver();
 
     isInitialized = true;
     console.log('[GetirFiltre] Ready! 🚀');
 }
 
-// Start when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
-}
+if (platform) {
+    listenForPlatformRequests();
 
-// Also handle SPA navigation
-let lastUrl = window.location.href;
-const urlObserver = new MutationObserver(() => {
-    if (window.location.href !== lastUrl) {
-        lastUrl = window.location.href;
-        isInitialized = false;
-        init();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            init().catch((error) => console.warn('[GetirFiltre] Init failed:', error));
+        });
+    } else {
+        init().catch((error) => console.warn('[GetirFiltre] Init failed:', error));
     }
-});
 
-urlObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-});
+    // Handle SPA navigation
+    let lastUrl = window.location.href;
+    const urlObserver = new MutationObserver(() => {
+        if (window.location.href !== lastUrl) {
+            lastUrl = window.location.href;
+            isInitialized = false;
+            filterEventSent = false;
+            init().catch((error) => console.warn('[GetirFiltre] Init failed:', error));
+        }
+    });
+
+    urlObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+    });
+}

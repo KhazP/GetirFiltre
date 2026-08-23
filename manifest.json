@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "GetirFiltre",
-    "description": "GetirYemek için Filte - Restoranları engelleyin ve gelişmiş filtreler uygulayın",
-    "version": "1.0.0",
+    "description": "Yemek siparişi için filtre - GetirYemek ve Uber Eats Trendyol Go'da restoranları engelleyin ve gelişmiş filtreler uygulayın",
+    "version": "1.1.1",
     "icons": {
         "16": "src/assets/icon16.png",
         "32": "src/assets/icon32.png",
@@ -19,7 +19,8 @@
         }
     },
     "permissions": [
-        "storage"
+        "storage",
+        "alarms"
     ],
     "options_ui": {
         "page": "src/options/index.html",
@@ -28,7 +29,10 @@
     "content_scripts": [
         {
             "matches": [
-                "https://getir.com/yemek/*"
+                "https://getir.com/yemek/*",
+                "https://www.getir.com/yemek/*",
+                "https://tgoyemek.com/*",
+                "https://www.tgoyemek.com/*"
             ],
             "js": [
                 "src/content/index.tsx"

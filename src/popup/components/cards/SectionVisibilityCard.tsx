@@ -12,17 +12,17 @@ export default function SectionVisibilityCard({ settings, updateSetting, disable
         {
             key: 'hideCampaignCarousel',
             label: 'Kampanya Gizle',
-            desc: 'Üst kampanya karuselini gizle'
+            desc: 'Üst kampanya karuselini gizle (Getir + Trendyol Go)'
         },
         {
             key: 'hideMudavimSection',
             label: 'Müdavim Gizle',
-            desc: 'GetirYemek Müdavim bölümünü gizle'
+            desc: 'GetirYemek Müdavim bölümünü gizle (sadece Getir)'
         },
         {
             key: 'hideAciktiysanSection',
             label: 'ACIKTIYSAN Gizle',
-            desc: 'ACIKTIYSAN bölümünü gizle'
+            desc: 'ACIKTIYSAN bölümünü gizle (sadece Getir)'
         }
     ];
 

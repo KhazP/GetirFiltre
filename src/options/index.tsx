@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import SettingsPage from '../popup/components/SettingsPage';
 import { useSettings } from '../popup/hooks/useSettings';
+import { DEFAULT_SETTINGS } from '../shared/types';
 import '../popup/index.css';
 
 function OptionsApp() {
@@ -11,6 +12,8 @@ function OptionsApp() {
         updateSetting,
         clearBlocklist,
         unblockRestaurant,
+        blockKeyword,
+        unblockKeyword,
         replaceSettings,
     } = useSettings();
 
@@ -65,11 +68,6 @@ function OptionsApp() {
     };
 
     const handleReset = async () => {
-        // Import DEFAULT_SETTINGS if needed or just pass empty/default object
-        // Since we don't have direct access to DEFAULT_SETTINGS here without import, 
-        // let's assume SettingsPage or useSettings handles the default value logic 
-        // or we import it. For now, rely on useSettings logic or import it.
-        const { DEFAULT_SETTINGS } = await import('../shared/types');
         await replaceSettings(DEFAULT_SETTINGS);
     };
 
@@ -88,6 +86,8 @@ function OptionsApp() {
                 onBack={() => { }} // No back button needed in full options page usually, or it acts as "Close"
                 unblockRestaurant={unblockRestaurant}
                 clearBlocklist={clearBlocklist}
+                blockKeyword={blockKeyword}
+                unblockKeyword={unblockKeyword}
                 onImport={handleImport}
                 onExport={handleExport}
                 onReset={handleReset}

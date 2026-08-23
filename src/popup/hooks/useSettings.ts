@@ -29,30 +29,7 @@ export function useSettings() {
         const newSettings = { ...settings, [key]: value };
         setSettings(newSettings);
         await storage.saveSettings(newSettings);
-
-        // Notify content script directly for instant updates
-        notifyContentScript(newSettings);
     };
-
-    /**
-     * Send settings to active GetirYemek tab for instant updates
-     */
-    async function notifyContentScript(settings: UserSettings): Promise<void> {
-        try {
-            // Get the active tab
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tab?.id && tab.url?.includes('getir.com/yemek')) {
-                chrome.tabs.sendMessage(tab.id, {
-                    type: 'SETTINGS_UPDATED',
-                    settings: settings,
-                }).catch(() => {
-                    // Tab may not have content script loaded - ignore
-                });
-            }
-        } catch (error) {
-            // Popup might not have tabs permission in all contexts - ignore
-        }
-    }
 
     // Toggle enabled
     const toggleEnabled = () => updateSetting('isEnabled', !settings.isEnabled);
@@ -60,7 +37,11 @@ export function useSettings() {
     // Clear blocklist
     const clearBlocklist = async () => {
         await storage.clearBlocklist();
-        setSettings((prev: UserSettings) => ({ ...prev, blockedRestaurants: [] }));
+        setSettings((prev: UserSettings) => ({
+            ...prev,
+            blockedRestaurants: [],
+            blockedKeywords: [],
+        }));
     };
 
     // Unblock single restaurant
@@ -72,11 +53,35 @@ export function useSettings() {
         }));
     };
 
+    // Block single keyword
+    const blockKeyword = async (keyword: string) => {
+        await storage.blockKeyword(keyword);
+        const normalized = keyword.trim().toLowerCase();
+        setSettings((prev: UserSettings) => {
+            if (normalized && !prev.blockedKeywords.includes(normalized)) {
+                return {
+                    ...prev,
+                    blockedKeywords: [...prev.blockedKeywords, normalized],
+                };
+            }
+            return prev;
+        });
+    };
+
+    // Unblock single keyword
+    const unblockKeyword = async (keyword: string) => {
+        await storage.unblockKeyword(keyword);
+        const normalized = keyword.trim().toLowerCase();
+        setSettings((prev: UserSettings) => ({
+            ...prev,
+            blockedKeywords: prev.blockedKeywords.filter((k: string) => k !== normalized),
+        }));
+    };
+
     // Replace all settings (for import/reset)
     const replaceSettings = async (newSettings: UserSettings) => {
         setSettings(newSettings);
         await storage.saveSettings(newSettings);
-        notifyContentScript(newSettings);
     };
 
     return {
@@ -86,6 +91,8 @@ export function useSettings() {
         toggleEnabled,
         clearBlocklist,
         unblockRestaurant,
+        blockKeyword,
+        unblockKeyword,
         replaceSettings,
     };
 }
