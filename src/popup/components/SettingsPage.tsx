@@ -1,5 +1,5 @@
-import { ArrowLeft, Shield, Star, ShoppingBag, MessageSquare, MapPin, Clock, Layout, Save, Tag, BarChart3 } from 'lucide-react';
-import { UserSettings } from '../../shared/types';
+import { ArrowLeft, BarChart3, Clock, Layout, MapPin, MessageSquare, Save, Shield, ShoppingBag, Star, Tag } from 'lucide-react';
+import { UpdateSetting, UserSettings } from '../../shared/types';
 import FilterSettings from './FilterSettings';
 import BentoGrid from './Bento/BentoGrid';
 import BentoCard from './Bento/BentoCard';
@@ -25,7 +25,7 @@ interface SettingsPageProps {
     onImport: (settings: UserSettings) => Promise<void>;
     onExport: () => void;
     onReset: () => void;
-    updateSetting: (key: keyof UserSettings, value: any) => Promise<void>;
+    updateSetting: UpdateSetting;
     isTabMode?: boolean;
 }
 

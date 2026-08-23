@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Settings, Trash2, X, ChevronDown, ChevronUp, Star, ShoppingBag, MessageSquare, MapPin, Clock, Shield, Check, EyeOff, Tag } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, ChevronDown, ChevronUp, Clock, EyeOff, LucideIcon, MapPin, MessageSquare, Settings, Shield, ShoppingBag, Star, Tag, Trash2, X } from 'lucide-react';
 import { useSettings } from './hooks/useSettings';
 import { useActivePlatform } from './hooks/useActivePlatform';
 import SettingsPage from './components/SettingsPage';
@@ -11,7 +11,7 @@ type Page = 'main' | 'settings';
 // ========== COMPONENTS DEFINED OUTSIDE TO PREVENT FOCUS LOSS ==========
 
 interface CompactInputProps {
-    icon: any;
+    icon: LucideIcon;
     value: number | null;
     onChange: (v: number | null) => void;
     label: string;

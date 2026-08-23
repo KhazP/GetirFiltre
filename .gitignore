@@ -1,5 +1,7 @@
 node_modules
-docs/
 dist/
 .vscode/
 *.log
+AGENTS.md
+GEMINI.md
+hidden_docs/

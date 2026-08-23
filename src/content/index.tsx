@@ -116,7 +116,7 @@ function sendBadgeUpdate(): void {
             isEnabled: currentSettings?.isEnabled ?? true,
             platform: platform?.id ?? null,
         });
-    } catch (error) {
+    } catch {
         // Ignore errors (e.g., extension context invalidated)
     }
 }

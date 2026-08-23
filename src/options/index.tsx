@@ -1,9 +1,29 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import SettingsPage from '../popup/components/SettingsPage';
 import { useSettings } from '../popup/hooks/useSettings';
-import { DEFAULT_SETTINGS } from '../shared/types';
+import { DEFAULT_SETTINGS, UserSettings } from '../shared/types';
 import '../popup/index.css';
+
+type SaveFilePickerOptions = {
+    suggestedName: string;
+    types: Array<{
+        description: string;
+        accept: Record<string, string[]>;
+    }>;
+};
+
+type FileHandleLike = {
+    createWritable: () => Promise<{
+        write: (data: string) => Promise<void>;
+        close: () => Promise<void>;
+    }>;
+};
+
+type SavePickerWindow = Window & {
+    showSaveFilePicker?: (options: SaveFilePickerOptions) => Promise<FileHandleLike>;
+};
 
 function OptionsApp() {
     const {
@@ -34,7 +54,13 @@ function OptionsApp() {
 
         try {
             // Use File System Access API for native Save dialog
-            const handle = await (window as any).showSaveFilePicker({
+            const saveWindow = window as SavePickerWindow;
+
+            if (!saveWindow.showSaveFilePicker) {
+                throw new Error('showSaveFilePicker not supported');
+            }
+
+            const handle = await saveWindow.showSaveFilePicker({
                 suggestedName: suggestedName,
                 types: [{
                     description: 'JSON Files',
@@ -45,9 +71,9 @@ function OptionsApp() {
             const writable = await handle.createWritable();
             await writable.write(jsonString);
             await writable.close();
-        } catch (err: any) {
+        } catch (err: unknown) {
             // User cancelled or API not supported
-            if (err.name !== 'AbortError') {
+            if (!(err instanceof DOMException && err.name === 'AbortError')) {
                 console.error('[GetirFiltre] Export failed:', err);
                 // Fallback to anchor download
                 const blob = new Blob([jsonString], { type: 'application/json' });
@@ -63,7 +89,7 @@ function OptionsApp() {
         }
     };
 
-    const handleImport = async (importedSettings: any) => {
+    const handleImport = async (importedSettings: UserSettings) => {
         await replaceSettings(importedSettings);
     };
 
